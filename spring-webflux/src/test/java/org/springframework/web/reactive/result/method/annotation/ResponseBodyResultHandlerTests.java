@@ -23,6 +23,7 @@ import java.util.List;
 
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Single;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
@@ -38,7 +39,6 @@ import org.springframework.http.codec.HttpMessageWriter;
 import org.springframework.http.codec.ResourceHttpMessageWriter;
 import org.springframework.http.codec.json.Jackson2JsonEncoder;
 import org.springframework.http.codec.xml.Jaxb2XmlEncoder;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -64,13 +64,13 @@ import static org.springframework.web.testfixture.method.ResolvableMethod.on;
  * @author Sebastien Deleuze
  * @author Rossen Stoyanchev
  */
-public class ResponseBodyResultHandlerTests {
+class ResponseBodyResultHandlerTests {
 
 	private ResponseBodyResultHandler resultHandler;
 
 
 	@BeforeEach
-	public void setup() throws Exception {
+	void setup() throws Exception {
 		List<HttpMessageWriter<?>> writerList = new ArrayList<>(5);
 		writerList.add(new EncoderHttpMessageWriter<>(new ByteBufferEncoder()));
 		writerList.add(new EncoderHttpMessageWriter<>(CharSequenceEncoder.allMimeTypes()));
@@ -83,7 +83,7 @@ public class ResponseBodyResultHandlerTests {
 
 
 	@Test
-	public void supports() {
+	void supports() {
 		Object controller = new TestController();
 		Method method;
 
@@ -96,7 +96,7 @@ public class ResponseBodyResultHandlerTests {
 	}
 
 	@Test
-	public void supportsRestController() {
+	void supportsRestController() {
 		Object controller = new TestRestController();
 		Method method;
 
@@ -156,7 +156,7 @@ public class ResponseBodyResultHandlerTests {
 	}
 
 	@Test
-	public void defaultOrder() {
+	void defaultOrder() {
 		assertThat(this.resultHandler.getOrder()).isEqualTo(100);
 	}
 

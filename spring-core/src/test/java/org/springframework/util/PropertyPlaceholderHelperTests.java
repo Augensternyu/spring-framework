@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package org.springframework.util;
 import java.util.Properties;
 import java.util.stream.Stream;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -29,11 +28,11 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.util.PropertyPlaceholderHelper.PlaceholderResolver;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 /**
  * Tests for {@link PropertyPlaceholderHelper}.
@@ -44,6 +43,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 class PropertyPlaceholderHelperTests {
 
 	private final PropertyPlaceholderHelper helper = new PropertyPlaceholderHelper("${", "}");
+
 
 	@Test
 	void withProperties() {
@@ -116,16 +116,15 @@ class PropertyPlaceholderHelperTests {
 		Properties props = new Properties();
 		props.setProperty("foo", "bar");
 
-		PropertyPlaceholderHelper helper = new PropertyPlaceholderHelper("${", "}", null, false);
-		assertThatIllegalArgumentException().isThrownBy(() ->
-				helper.replacePlaceholders(text, props));
-
+		PropertyPlaceholderHelper helper = new PropertyPlaceholderHelper("${", "}", null, null, false);
+		assertThatExceptionOfType(PlaceholderResolutionException.class)
+				.isThrownBy(() -> helper.replacePlaceholders(text, props));
 	}
 
 	@Nested
 	class DefaultValueTests {
 
-		private final PropertyPlaceholderHelper helper = new PropertyPlaceholderHelper("${", "}", ":", true);
+		private final PropertyPlaceholderHelper helper = new PropertyPlaceholderHelper("${", "}", ":", null, true);
 
 		@ParameterizedTest(name = "{0} -> {1}")
 		@MethodSource("defaultValues")
@@ -137,12 +136,11 @@ class PropertyPlaceholderHelperTests {
 		}
 
 		@Test
-		@Disabled("gh-26268")
 		void defaultValueIsNotEvaluatedEarly() {
 			PlaceholderResolver resolver = mockPlaceholderResolver("one", "1");
-			assertThat(this.helper.replacePlaceholders("This is ${one:or${two}}",resolver)).isEqualTo("This is 1");
+			assertThat(this.helper.replacePlaceholders("This is ${one:or${two}}", resolver)).isEqualTo("This is 1");
 			verify(resolver).resolvePlaceholder("one");
-			verifyNoMoreInteractions(resolver);
+			verify(resolver, never()).resolvePlaceholder("two");
 		}
 
 		static Stream<Arguments> defaultValues() {
@@ -156,13 +154,30 @@ class PropertyPlaceholderHelperTests {
 			);
 		}
 
+		@ParameterizedTest(name = "{0} -> {1}")
+		@MethodSource("exactMatchPlaceholders")
+		void placeholdersWithExactMatchAreConsidered(String text, String expected) {
+			Properties properties = new Properties();
+			properties.setProperty("prefix://my-service", "example-service");
+			properties.setProperty("px", "prefix");
+			properties.setProperty("p1", "${prefix://my-service}");
+			assertThat(this.helper.replacePlaceholders(text, properties)).isEqualTo(expected);
+		}
+
+		static Stream<Arguments> exactMatchPlaceholders() {
+			return Stream.of(
+					Arguments.of("${prefix://my-service}", "example-service"),
+					Arguments.of("${p1}", "example-service")
+			);
+		}
 	}
 
-	PlaceholderResolver mockPlaceholderResolver(String... pairs) {
+
+	private static PlaceholderResolver mockPlaceholderResolver(String... pairs) {
 		if (pairs.length % 2 == 1) {
 			throw new IllegalArgumentException("size must be even, it is a set of key=value pairs");
 		}
-		PlaceholderResolver resolver = mock(PlaceholderResolver.class);
+		PlaceholderResolver resolver = mock();
 		for (int i = 0; i < pairs.length; i += 2) {
 			String key = pairs[i];
 			String value = pairs[i + 1];
@@ -170,6 +185,5 @@ class PropertyPlaceholderHelperTests {
 		}
 		return resolver;
 	}
-
 
 }

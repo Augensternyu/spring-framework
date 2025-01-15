@@ -26,6 +26,7 @@ import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationHandler;
 import io.micrometer.observation.tck.TestObservationRegistry;
 import io.micrometer.observation.tck.TestObservationRegistryAssert;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -42,6 +43,7 @@ import org.springframework.http.converter.HttpMessageConverter;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -157,6 +159,31 @@ class RestTemplateObservationTests {
 		assertThatHttpObservation().hasLowCardinalityKeyValue("outcome", "UNKNOWN");
 	}
 
+	@Test // gh-32060
+	void executeShouldRecordErrorsThrownByErrorHandler() throws Exception {
+		mockSentRequest(GET, "https://example.org");
+		mockResponseStatus(HttpStatus.OK);
+		mockResponseBody("Hello World", MediaType.TEXT_PLAIN);
+		given(errorHandler.hasError(any())).willThrow(new IllegalStateException("error handler"));
+
+		assertThatIllegalStateException().isThrownBy(() ->
+				template.execute("https://example.org", GET, null, null));
+
+		assertThatHttpObservation().hasLowCardinalityKeyValue("exception", "IllegalStateException");
+	}
+
+	@Test // gh-32060
+	void executeShouldCreateObservationScope() throws Exception {
+		mockSentRequest(GET, "https://example.org");
+		mockResponseStatus(HttpStatus.OK);
+		mockResponseBody("Hello World", MediaType.TEXT_PLAIN);
+		ObservationErrorHandler observationErrorHandler = new ObservationErrorHandler(observationRegistry);
+		template.setErrorHandler(observationErrorHandler);
+
+		template.execute("https://example.org", GET, null, null);
+		assertThat(observationErrorHandler.currentObservation).isNotNull();
+	}
+
 
 	private void mockSentRequest(HttpMethod method, String uri) throws Exception {
 		mockSentRequest(method, uri, new HttpHeaders());
@@ -187,8 +214,7 @@ class RestTemplateObservationTests {
 
 
 	private TestObservationRegistryAssert.TestObservationRegistryAssertReturningObservationContextAssert assertThatHttpObservation() {
-		return TestObservationRegistryAssert.assertThat(this.observationRegistry)
-				.hasObservationWithNameEqualTo("http.client.requests").that();
+		return assertThat(this.observationRegistry).hasObservationWithNameEqualTo("http.client.requests").that();
 	}
 
 	static class ContextAssertionObservationHandler implements ObservationHandler<ClientRequestObservationContext> {
@@ -201,6 +227,27 @@ class RestTemplateObservationTests {
 		@Override
 		public void onStart(ClientRequestObservationContext context) {
 			assertThat(context.getCarrier()).isNotNull();
+		}
+	}
+
+	static class ObservationErrorHandler implements ResponseErrorHandler {
+
+		final TestObservationRegistry observationRegistry;
+
+		@Nullable Observation currentObservation;
+
+		ObservationErrorHandler(TestObservationRegistry observationRegistry) {
+			this.observationRegistry = observationRegistry;
+		}
+
+		@Override
+		public boolean hasError(ClientHttpResponse response) {
+			return true;
+		}
+
+		@Override
+		public void handleError(URI uri, HttpMethod httpMethod, ClientHttpResponse response) {
+			currentObservation = this.observationRegistry.getCurrentObservation();
 		}
 	}
 

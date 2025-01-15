@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -29,6 +28,8 @@ import java.util.function.Supplier;
 
 import javax.lang.model.element.Modifier;
 
+import org.assertj.core.api.InstanceOfAssertFactories;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
@@ -58,7 +59,6 @@ import org.springframework.core.test.tools.TestCompiler;
 import org.springframework.javapoet.CodeBlock;
 import org.springframework.javapoet.MethodSpec;
 import org.springframework.javapoet.ParameterizedTypeName;
-import org.springframework.lang.Nullable;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -90,6 +90,21 @@ class BeanDefinitionPropertiesCodeGeneratorTests {
 	void setPrimaryWhenTrue() {
 		this.beanDefinition.setPrimary(true);
 		compile((actual, compiled) -> assertThat(actual.isPrimary()).isTrue());
+	}
+
+	@Test
+	void setFallbackWhenFalse() {
+		this.beanDefinition.setFallback(false);
+		compile((actual, compiled) -> {
+			assertThat(compiled.getSourceFile()).doesNotContain("setFallback");
+			assertThat(actual.isFallback()).isFalse();
+		});
+	}
+
+	@Test
+	void setFallbackWhenTrue() {
+		this.beanDefinition.setFallback(true);
+		compile((actual, compiled) -> assertThat(actual.isFallback()).isTrue());
 	}
 
 	@Test
@@ -260,11 +275,11 @@ class BeanDefinitionPropertiesCodeGeneratorTests {
 		compile((actual, compiled) -> {
 			ConstructorArgumentValues argumentValues = actual.getConstructorArgumentValues();
 			List<ValueHolder> values = argumentValues.getGenericArgumentValues();
-			assertThat(values).element(0).satisfies(assertValueHolder(String.class, null, null));
-			assertThat(values).element(1).satisfies(assertValueHolder(2, Long.class, null));
-			assertThat(values).element(2).satisfies(assertValueHolder("value", null, "param1"));
-			assertThat(values).element(3).satisfies(assertValueHolder("another", CharSequence.class, "param2"));
-			assertThat(values).hasSize(4);
+			assertThat(values).satisfiesExactly(
+					assertValueHolder(String.class, null, null),
+					assertValueHolder(2, Long.class, null),
+					assertValueHolder("value", null, "param1"),
+					assertValueHolder("another", CharSequence.class, "param2"));
 			assertThat(argumentValues.getIndexedArgumentValues()).isEmpty();
 		});
 	}
@@ -324,8 +339,8 @@ class BeanDefinitionPropertiesCodeGeneratorTests {
 		this.beanDefinition.getPropertyValues().add("value", managedList);
 		compile((actual, compiled) -> {
 			Object value = actual.getPropertyValues().get("value");
-			assertThat(value).isInstanceOf(ManagedList.class);
-			assertThat(((List<?>) value)).element(0).isInstanceOf(BeanReference.class);
+			assertThat(value).isInstanceOf(ManagedList.class).asInstanceOf(InstanceOfAssertFactories.LIST)
+					.singleElement().isInstanceOf(BeanReference.class);
 		});
 	}
 
@@ -336,8 +351,9 @@ class BeanDefinitionPropertiesCodeGeneratorTests {
 		this.beanDefinition.getPropertyValues().add("value", managedSet);
 		compile((actual, compiled) -> {
 			Object value = actual.getPropertyValues().get("value");
-			assertThat(value).isInstanceOf(ManagedSet.class);
-			assertThat(((Set<?>) value)).element(0).isInstanceOf(BeanReference.class);
+			assertThat(value).isInstanceOf(ManagedSet.class)
+					.asInstanceOf(InstanceOfAssertFactories.COLLECTION)
+					.singleElement().isInstanceOf(BeanReference.class);
 		});
 	}
 
@@ -348,8 +364,9 @@ class BeanDefinitionPropertiesCodeGeneratorTests {
 		this.beanDefinition.getPropertyValues().add("value", managedMap);
 		compile((actual, compiled) -> {
 			Object value = actual.getPropertyValues().get("value");
-			assertThat(value).isInstanceOf(ManagedMap.class);
-			assertThat(((Map<?, ?>) value).get("test")).isInstanceOf(BeanReference.class);
+			assertThat(value).isInstanceOf(ManagedMap.class)
+					.asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
+					.hasEntrySatisfying("test", ref -> assertThat(ref).isInstanceOf(BeanReference.class));
 		});
 	}
 
@@ -429,9 +446,8 @@ class BeanDefinitionPropertiesCodeGeneratorTests {
 		this.beanDefinition.addQualifier(new AutowireCandidateQualifier("com.example.Another", ChronoUnit.SECONDS));
 		compile((actual, compiled) -> {
 			List<AutowireCandidateQualifier> qualifiers = new ArrayList<>(actual.getQualifiers());
-			assertThat(qualifiers).element(0).satisfies(isQualifierFor("com.example.Qualifier", "id"));
-			assertThat(qualifiers).element(1).satisfies(isQualifierFor("com.example.Another", ChronoUnit.SECONDS));
-			assertThat(qualifiers).hasSize(2);
+			assertThat(qualifiers).satisfiesExactly(isQualifierFor("com.example.Qualifier", "id"),
+					isQualifierFor("com.example.Another", ChronoUnit.SECONDS));
 		});
 	}
 
@@ -552,13 +568,13 @@ class BeanDefinitionPropertiesCodeGeneratorTests {
 
 	private void assertHasMethodInvokeHints(Class<?> beanType, String... methodNames) {
 		assertThat(methodNames).allMatch(methodName -> RuntimeHintsPredicates.reflection()
-				.onMethod(beanType, methodName).invoke()
+				.onMethodInvocation(beanType, methodName)
 				.test(this.generationContext.getRuntimeHints()));
 	}
 
 	private void assertHasDeclaredFieldsHint(Class<?> beanType) {
 		assertThat(RuntimeHintsPredicates.reflection()
-				.onType(beanType).withMemberCategory(MemberCategory.DECLARED_FIELDS))
+				.onType(beanType).withMemberCategory(MemberCategory.INVOKE_DECLARED_FIELDS))
 				.accepts(this.generationContext.getRuntimeHints());
 	}
 
@@ -615,7 +631,7 @@ class BeanDefinitionPropertiesCodeGeneratorTests {
 
 	}
 
-	interface Initializable {
+	public interface Initializable {
 
 		void initialize();
 	}
@@ -627,7 +643,7 @@ class BeanDefinitionPropertiesCodeGeneratorTests {
 		}
 	}
 
-	interface Disposable {
+	public interface Disposable {
 
 		void dispose();
 	}
@@ -690,15 +706,13 @@ class BeanDefinitionPropertiesCodeGeneratorTests {
 			this.name = name;
 		}
 
-		@Nullable
 		@Override
-		public String getObject() {
+		public @Nullable String getObject() {
 			return getPrefix() + " " + getName();
 		}
 
-		@Nullable
 		@Override
-		public Class<?> getObjectType() {
+		public @Nullable Class<?> getObjectType() {
 			return String.class;
 		}
 

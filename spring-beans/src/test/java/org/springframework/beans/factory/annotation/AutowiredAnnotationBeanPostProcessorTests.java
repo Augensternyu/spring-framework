@@ -40,6 +40,7 @@ import java.util.concurrent.Callable;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -73,11 +74,11 @@ import org.springframework.core.ResolvableType;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.testfixture.io.SerializationTestUtils;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.ReflectionUtils;
 
+import static java.util.Map.entry;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
@@ -583,15 +584,9 @@ class AutowiredAnnotationBeanPostProcessorTests {
 		assertThat(bean.getTestBean3()).isSameAs(tb);
 		assertThat(bean.getTestBean4()).isSameAs(tb);
 		assertThat(bean.getIndexedTestBean()).isSameAs(itb);
-		assertThat(bean.getNestedTestBeans()).hasSize(2);
-		assertThat(bean.getNestedTestBeans()).element(0).isSameAs(ntb1);
-		assertThat(bean.getNestedTestBeans()).element(1).isSameAs(ntb2);
-		assertThat(bean.nestedTestBeansSetter).hasSize(2);
-		assertThat(bean.nestedTestBeansSetter).element(0).isSameAs(ntb1);
-		assertThat(bean.nestedTestBeansSetter).element(1).isSameAs(ntb2);
-		assertThat(bean.nestedTestBeansField).hasSize(2);
-		assertThat(bean.nestedTestBeansField).element(0).isSameAs(ntb1);
-		assertThat(bean.nestedTestBeansField).element(1).isSameAs(ntb2);
+		assertThat(bean.getNestedTestBeans()).containsExactly(ntb1, ntb2);
+		assertThat(bean.nestedTestBeansSetter).containsExactly(ntb1, ntb2);
+		assertThat(bean.nestedTestBeansField).containsExactly(ntb1, ntb2);
 	}
 
 	@Test
@@ -614,12 +609,9 @@ class AutowiredAnnotationBeanPostProcessorTests {
 		assertThat(bean.getTestBean3()).isSameAs(tb);
 		assertThat(bean.getTestBean4()).isSameAs(tb);
 		assertThat(bean.getIndexedTestBean()).isSameAs(itb);
-		assertThat(bean.getNestedTestBeans()).hasSize(1);
-		assertThat(bean.getNestedTestBeans()).element(0).isSameAs(ntb1);
-		assertThat(bean.nestedTestBeansSetter).hasSize(1);
-		assertThat(bean.nestedTestBeansSetter).element(0).isSameAs(ntb1);
-		assertThat(bean.nestedTestBeansField).hasSize(1);
-		assertThat(bean.nestedTestBeansField).element(0).isSameAs(ntb1);
+		assertThat(bean.getNestedTestBeans()).containsExactly(ntb1);
+		assertThat(bean.nestedTestBeansSetter).containsExactly(ntb1);
+		assertThat(bean.nestedTestBeansField).containsExactly(ntb1);
 	}
 
 	@Test
@@ -1057,8 +1049,7 @@ class AutowiredAnnotationBeanPostProcessorTests {
 		ConstructorsCollectionResourceInjectionBean bean = bf.getBean("annotatedBean", ConstructorsCollectionResourceInjectionBean.class);
 		assertThat(bean.getTestBean3()).isNull();
 		assertThat(bean.getTestBean4()).isSameAs(tb);
-		assertThat(bean.getNestedTestBeans()).hasSize(1);
-		assertThat(bean.getNestedTestBeans()).element(0).isSameAs(ntb2);
+		assertThat(bean.getNestedTestBeans()).containsExactly(ntb2);
 
 		Map<String, NestedTestBean> map = bf.getBeansOfType(NestedTestBean.class);
 		assertThat(map.get("nestedTestBean1")).isNull();
@@ -1079,9 +1070,7 @@ class AutowiredAnnotationBeanPostProcessorTests {
 		ConstructorsCollectionResourceInjectionBean bean = bf.getBean("annotatedBean", ConstructorsCollectionResourceInjectionBean.class);
 		assertThat(bean.getTestBean3()).isNull();
 		assertThat(bean.getTestBean4()).isSameAs(tb);
-		assertThat(bean.getNestedTestBeans()).hasSize(2);
-		assertThat(bean.getNestedTestBeans()).element(0).isSameAs(ntb1);
-		assertThat(bean.getNestedTestBeans()).element(1).isSameAs(ntb2);
+		assertThat(bean.getNestedTestBeans()).contains(ntb1, ntb2);
 	}
 
 	@Test
@@ -1245,16 +1234,17 @@ class AutowiredAnnotationBeanPostProcessorTests {
 		RootBeanDefinition tb2 = new RootBeanDefinition(NullFactoryMethods.class);
 		tb2.setFactoryMethodName("createTestBean");
 		bf.registerBeanDefinition("testBean2", tb2);
+		bf.registerAlias("testBean2", "testBean");
 
 		MapConstructorInjectionBean bean = bf.getBean("annotatedBean", MapConstructorInjectionBean.class);
-		assertThat(bean.getTestBeanMap()).hasSize(1);
-		assertThat(bean.getTestBeanMap().get("testBean1")).isSameAs(tb1);
-		assertThat(bean.getTestBeanMap().get("testBean2")).isNull();
+		assertThat(bean.getTestBean()).hasSize(1);
+		assertThat(bean.getTestBean().get("testBean1")).isSameAs(tb1);
+		assertThat(bean.getTestBean().get("testBean2")).isNull();
 
 		bean = bf.getBean("annotatedBean", MapConstructorInjectionBean.class);
-		assertThat(bean.getTestBeanMap()).hasSize(1);
-		assertThat(bean.getTestBeanMap().get("testBean1")).isSameAs(tb1);
-		assertThat(bean.getTestBeanMap().get("testBean2")).isNull();
+		assertThat(bean.getTestBean()).hasSize(1);
+		assertThat(bean.getTestBean().get("testBean1")).isSameAs(tb1);
+		assertThat(bean.getTestBean().get("testBean2")).isNull();
 	}
 
 	@Test
@@ -1266,6 +1256,7 @@ class AutowiredAnnotationBeanPostProcessorTests {
 		TestBean tb2 = new TestBean("tb2");
 		bf.registerSingleton("testBean1", tb1);
 		bf.registerSingleton("testBean2", tb2);
+		bf.registerAlias("testBean1", "testBean");
 
 		MapFieldInjectionBean bean = bf.getBean("annotatedBean", MapFieldInjectionBean.class);
 		assertThat(bean.getTestBeanMap()).hasSize(2);
@@ -1350,9 +1341,9 @@ class AutowiredAnnotationBeanPostProcessorTests {
 		bf.registerSingleton("otherMap", new Properties());
 
 		MapConstructorInjectionBean bean = bf.getBean("annotatedBean", MapConstructorInjectionBean.class);
-		assertThat(bean.getTestBeanMap()).isSameAs(tbm);
+		assertThat(bean.getTestBean()).isSameAs(tbm);
 		bean = bf.getBean("annotatedBean", MapConstructorInjectionBean.class);
-		assertThat(bean.getTestBeanMap()).isSameAs(tbm);
+		assertThat(bean.getTestBean()).isSameAs(tbm);
 	}
 
 	@Test
@@ -1366,9 +1357,9 @@ class AutowiredAnnotationBeanPostProcessorTests {
 		bf.registerSingleton("otherMap", new HashMap<>());
 
 		MapConstructorInjectionBean bean = bf.getBean("annotatedBean", MapConstructorInjectionBean.class);
-		assertThat(bean.getTestBeanMap()).isSameAs(bf.getBean("myTestBeanMap"));
+		assertThat(bean.getTestBean()).isSameAs(bf.getBean("myTestBeanMap"));
 		bean = bf.getBean("annotatedBean", MapConstructorInjectionBean.class);
-		assertThat(bean.getTestBeanMap()).isSameAs(bf.getBean("myTestBeanMap"));
+		assertThat(bean.getTestBean()).isSameAs(bf.getBean("myTestBeanMap"));
 	}
 
 	@Test
@@ -1515,8 +1506,7 @@ class AutowiredAnnotationBeanPostProcessorTests {
 		SelfInjectionCollectionBean bean = bf.getBean("annotatedBean", SelfInjectionCollectionBean.class);
 		SelfInjectionCollectionBean bean2 = bf.getBean("annotatedBean2", SelfInjectionCollectionBean.class);
 		assertThat(bean.reference).isSameAs(bean2);
-		assertThat(bean2.referenceCollection).hasSize(1);
-		assertThat(bean.referenceCollection).element(0).isSameAs(bean2);
+		assertThat(bean2.referenceCollection).containsExactly(bean2);
 	}
 
 	@Test
@@ -1590,32 +1580,33 @@ class AutowiredAnnotationBeanPostProcessorTests {
 	@Test
 	void objectProviderInjectionWithPrototype() {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(ObjectProviderInjectionBean.class));
-		RootBeanDefinition tbd = new RootBeanDefinition(TestBean.class);
-		tbd.setScope(BeanDefinition.SCOPE_PROTOTYPE);
-		bf.registerBeanDefinition("testBean", tbd);
+		RootBeanDefinition tb1 = new RootBeanDefinition(TestBean.class);
+		tb1.setScope(BeanDefinition.SCOPE_PROTOTYPE);
+		bf.registerBeanDefinition("testBean1", tb1);
+		RootBeanDefinition tb2 = new RootBeanDefinition(TestBean.class);
+		tb2.setScope(BeanDefinition.SCOPE_PROTOTYPE);
+		tb2.setPrimary(true);
+		bf.registerBeanDefinition("testBean2", tb2);
+		bf.registerAlias("testBean2", "testBean");
 
 		ObjectProviderInjectionBean bean = bf.getBean("annotatedBean", ObjectProviderInjectionBean.class);
-		assertThat(bean.getTestBean()).isEqualTo(bf.getBean("testBean"));
-		assertThat(bean.getTestBean("myName")).isEqualTo(bf.getBean("testBean", "myName"));
-		assertThat(bean.getOptionalTestBean()).isEqualTo(bf.getBean("testBean"));
-		assertThat(bean.getOptionalTestBeanWithDefault()).isEqualTo(bf.getBean("testBean"));
-		assertThat(bean.consumeOptionalTestBean()).isEqualTo(bf.getBean("testBean"));
-		assertThat(bean.getUniqueTestBean()).isEqualTo(bf.getBean("testBean"));
-		assertThat(bean.getUniqueTestBeanWithDefault()).isEqualTo(bf.getBean("testBean"));
-		assertThat(bean.consumeUniqueTestBean()).isEqualTo(bf.getBean("testBean"));
+		assertThat(bean.getTestBean()).isEqualTo(bf.getBean("testBean2"));
+		assertThat(bean.getTestBean("myName")).isEqualTo(bf.getBean("testBean2", "myName"));
+		assertThat(bean.getOptionalTestBean()).isEqualTo(bf.getBean("testBean2"));
+		assertThat(bean.getOptionalTestBeanWithDefault()).isEqualTo(bf.getBean("testBean2"));
+		assertThat(bean.consumeOptionalTestBean()).isEqualTo(bf.getBean("testBean2"));
+		assertThat(bean.getUniqueTestBean()).isEqualTo(bf.getBean("testBean2"));
+		assertThat(bean.getUniqueTestBeanWithDefault()).isEqualTo(bf.getBean("testBean2"));
+		assertThat(bean.consumeUniqueTestBean()).isEqualTo(bf.getBean("testBean2"));
 
 		List<TestBean> testBeans = bean.iterateTestBeans();
-		assertThat(testBeans).hasSize(1);
-		assertThat(testBeans).contains(bf.getBean("testBean", TestBean.class));
+		assertThat(testBeans).containsExactly(bf.getBean("testBean1", TestBean.class), bf.getBean("testBean2", TestBean.class));
 		testBeans = bean.forEachTestBeans();
-		assertThat(testBeans).hasSize(1);
-		assertThat(testBeans).contains(bf.getBean("testBean", TestBean.class));
+		assertThat(testBeans).containsExactly(bf.getBean("testBean1", TestBean.class), bf.getBean("testBean2", TestBean.class));
 		testBeans = bean.streamTestBeans();
-		assertThat(testBeans).hasSize(1);
-		assertThat(testBeans).contains(bf.getBean("testBean", TestBean.class));
+		assertThat(testBeans).containsExactly(bf.getBean("testBean1", TestBean.class), bf.getBean("testBean2", TestBean.class));
 		testBeans = bean.sortedTestBeans();
-		assertThat(testBeans).hasSize(1);
-		assertThat(testBeans).contains(bf.getBean("testBean", TestBean.class));
+		assertThat(testBeans).containsExactly(bf.getBean("testBean1", TestBean.class), bf.getBean("testBean2", TestBean.class));
 	}
 
 	@Test
@@ -1682,22 +1673,12 @@ class AutowiredAnnotationBeanPostProcessorTests {
 		assertThat(bean.getUniqueTestBean()).isNull();
 		assertThat(bean.consumeUniqueTestBean()).isNull();
 
-		List<?> testBeans = bean.iterateTestBeans();
-		assertThat(testBeans).hasSize(2);
-		assertThat(testBeans).element(0).isSameAs(bf.getBean("testBean1"));
-		assertThat(testBeans).element(1).isSameAs(bf.getBean("testBean2"));
-		testBeans = bean.forEachTestBeans();
-		assertThat(testBeans).hasSize(2);
-		assertThat(testBeans).element(0).isSameAs(bf.getBean("testBean1"));
-		assertThat(testBeans).element(1).isSameAs(bf.getBean("testBean2"));
-		testBeans = bean.streamTestBeans();
-		assertThat(testBeans).hasSize(2);
-		assertThat(testBeans).element(0).isSameAs(bf.getBean("testBean1"));
-		assertThat(testBeans).element(1).isSameAs(bf.getBean("testBean2"));
-		testBeans = bean.sortedTestBeans();
-		assertThat(testBeans).hasSize(2);
-		assertThat(testBeans).element(0).isSameAs(bf.getBean("testBean1"));
-		assertThat(testBeans).element(1).isSameAs(bf.getBean("testBean2"));
+		TestBean testBean1 = bf.getBean("testBean1", TestBean.class);
+		TestBean testBean2 = bf.getBean("testBean2", TestBean.class);
+		assertThat(bean.iterateTestBeans()).containsExactly(testBean1, testBean2);
+		assertThat(bean.forEachTestBeans()).containsExactly(testBean1, testBean2);
+		assertThat(bean.streamTestBeans()).containsExactly(testBean1, testBean2);
+		assertThat(bean.sortedTestBeans()).containsExactly(testBean1, testBean2);
 	}
 
 	@Test
@@ -1713,29 +1694,19 @@ class AutowiredAnnotationBeanPostProcessorTests {
 		bf.registerBeanDefinition("testBean2", tb2);
 
 		ObjectProviderInjectionBean bean = bf.getBean("annotatedBean", ObjectProviderInjectionBean.class);
-		assertThat(bean.getTestBean()).isSameAs(bf.getBean("testBean1"));
-		assertThat(bean.getOptionalTestBean()).isSameAs(bf.getBean("testBean1"));
-		assertThat(bean.consumeOptionalTestBean()).isSameAs(bf.getBean("testBean1"));
-		assertThat(bean.getUniqueTestBean()).isSameAs(bf.getBean("testBean1"));
-		assertThat(bean.consumeUniqueTestBean()).isSameAs(bf.getBean("testBean1"));
+		TestBean testBean1 = bf.getBean("testBean1", TestBean.class);
+		assertThat(bean.getTestBean()).isSameAs(testBean1);
+		assertThat(bean.getOptionalTestBean()).isSameAs(testBean1);
+		assertThat(bean.consumeOptionalTestBean()).isSameAs(testBean1);
+		assertThat(bean.getUniqueTestBean()).isSameAs(testBean1);
+		assertThat(bean.consumeUniqueTestBean()).isSameAs(testBean1);
 		assertThat(bf.containsSingleton("testBean2")).isFalse();
 
-		List<?> testBeans = bean.iterateTestBeans();
-		assertThat(testBeans).hasSize(2);
-		assertThat(testBeans).element(0).isSameAs(bf.getBean("testBean1"));
-		assertThat(testBeans).element(1).isSameAs(bf.getBean("testBean2"));
-		testBeans = bean.forEachTestBeans();
-		assertThat(testBeans).hasSize(2);
-		assertThat(testBeans).element(0).isSameAs(bf.getBean("testBean1"));
-		assertThat(testBeans).element(1).isSameAs(bf.getBean("testBean2"));
-		testBeans = bean.streamTestBeans();
-		assertThat(testBeans).hasSize(2);
-		assertThat(testBeans).element(0).isSameAs(bf.getBean("testBean1"));
-		assertThat(testBeans).element(1).isSameAs(bf.getBean("testBean2"));
-		testBeans = bean.sortedTestBeans();
-		assertThat(testBeans).hasSize(2);
-		assertThat(testBeans).element(0).isSameAs(bf.getBean("testBean2"));
-		assertThat(testBeans).element(1).isSameAs(bf.getBean("testBean1"));
+		TestBean testBean2 = bf.getBean("testBean2", TestBean.class);
+		assertThat(bean.iterateTestBeans()).containsExactly(testBean1, testBean2);
+		assertThat(bean.forEachTestBeans()).containsExactly(testBean1, testBean2);
+		assertThat(bean.streamTestBeans()).containsExactly(testBean1, testBean2);
+		assertThat(bean.sortedTestBeans()).containsExactly(testBean2, testBean1);
 	}
 
 	@Test
@@ -1751,10 +1722,8 @@ class AutowiredAnnotationBeanPostProcessorTests {
 		bf.registerBeanDefinition("testBean2", tb2);
 
 		ObjectProviderInjectionBean bean = bf.getBean("annotatedBean", ObjectProviderInjectionBean.class);
-		List<?> testBeans = bean.sortedTestBeans();
-		assertThat(testBeans).hasSize(2);
-		assertThat(testBeans).element(0).isSameAs(bf.getBean("testBean2"));
-		assertThat(testBeans).element(1).isSameAs(bf.getBean("testBean1"));
+		assertThat(bean.sortedTestBeans()).containsExactly(bf.getBean("testBean2", TestBean.class),
+				bf.getBean("testBean1", TestBean.class));
 	}
 
 	@Test
@@ -2094,18 +2063,12 @@ class AutowiredAnnotationBeanPostProcessorTests {
 		Repository<?> ir = bf.getBean("integerRepository", Repository.class);
 		assertThat(bean.stringRepository).isSameAs(sr);
 		assertThat(bean.integerRepository).isSameAs(ir);
-		assertThat(bean.stringRepositoryArray).hasSize(1);
-		assertThat(bean.integerRepositoryArray).hasSize(1);
-		assertThat(bean.stringRepositoryArray[0]).isSameAs(sr);
-		assertThat(bean.integerRepositoryArray[0]).isSameAs(ir);
-		assertThat(bean.stringRepositoryList).hasSize(1);
-		assertThat(bean.integerRepositoryList).hasSize(1);
-		assertThat(bean.stringRepositoryList).element(0).isSameAs(sr);
-		assertThat(bean.integerRepositoryList).element(0).isSameAs(ir);
-		assertThat(bean.stringRepositoryMap).hasSize(1);
-		assertThat(bean.integerRepositoryMap).hasSize(1);
-		assertThat(bean.stringRepositoryMap.get("stringRepo")).isSameAs(sr);
-		assertThat(bean.integerRepositoryMap.get("integerRepository")).isSameAs(ir);
+		assertThat(bean.stringRepositoryArray).singleElement().isSameAs(sr);
+		assertThat(bean.integerRepositoryArray).singleElement().isSameAs(ir);
+		assertThat(bean.stringRepositoryList).singleElement().isSameAs(sr);
+		assertThat(bean.integerRepositoryList).singleElement().isSameAs(ir);
+		assertThat(bean.stringRepositoryMap).containsOnly(entry("stringRepo", sr));
+		assertThat(bean.integerRepositoryMap).containsOnly(entry("integerRepository", ir));
 	}
 
 	@Test
@@ -2121,16 +2084,14 @@ class AutowiredAnnotationBeanPostProcessorTests {
 		Repository<?> repo = bf.getBean("repo", Repository.class);
 		assertThat(bean.repository).isSameAs(repo);
 		assertThat(bean.stringRepository).isSameAs(repo);
-		assertThat(bean.repositoryArray).hasSize(1);
+		assertThat(bean.repositoryArray).containsExactly(repo);
 		assertThat(bean.stringRepositoryArray).hasSize(1);
-		assertThat(bean.repositoryArray[0]).isSameAs(repo);
 		assertThat(bean.stringRepositoryArray[0]).isSameAs(repo);
 		assertThat(bean.repositoryList).containsExactly(repo);
 		assertThat(bean.stringRepositoryList).hasSize(1);
 		assertThat(bean.stringRepositoryList).element(0).isSameAs(repo);
-		assertThat(bean.repositoryMap).hasSize(1);
+		assertThat(bean.repositoryMap).containsOnly(entry("repo", repo));
 		assertThat(bean.stringRepositoryMap).hasSize(1);
-		assertThat(bean.repositoryMap.get("repo")).isSameAs(repo);
 		assertThat(bean.stringRepositoryMap.get("repo")).isSameAs(repo);
 
 		assertThat(bf.getBeanNamesForType(ResolvableType.forClassWithGenerics(Repository.class, String.class))).isEqualTo(new String[] {"repo"});
@@ -2339,7 +2300,7 @@ class AutowiredAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	@SuppressWarnings("rawtypes")
+	@SuppressWarnings({ "rawtypes", "unchecked" })
 	void genericsBasedConstructorInjectionWithNonTypedTarget() {
 		RootBeanDefinition bd = new RootBeanDefinition(RepositoryConstructorInjectionBean.class);
 		bd.setScope(BeanDefinition.SCOPE_PROTOTYPE);
@@ -2363,6 +2324,7 @@ class AutowiredAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
+	@SuppressWarnings("unchecked")
 	void genericsBasedConstructorInjectionWithNonGenericTarget() {
 		RootBeanDefinition bd = new RootBeanDefinition(RepositoryConstructorInjectionBean.class);
 		bd.setScope(BeanDefinition.SCOPE_PROTOTYPE);
@@ -2386,7 +2348,7 @@ class AutowiredAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	@SuppressWarnings("rawtypes")
+	@SuppressWarnings({ "rawtypes", "unchecked" })
 	void genericsBasedConstructorInjectionWithMixedTargets() {
 		RootBeanDefinition bd = new RootBeanDefinition(RepositoryConstructorInjectionBean.class);
 		bd.setScope(BeanDefinition.SCOPE_PROTOTYPE);
@@ -2412,6 +2374,7 @@ class AutowiredAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
+	@SuppressWarnings("unchecked")
 	void genericsBasedConstructorInjectionWithMixedTargetsIncludingNonGeneric() {
 		RootBeanDefinition bd = new RootBeanDefinition(RepositoryConstructorInjectionBean.class);
 		bd.setScope(BeanDefinition.SCOPE_PROTOTYPE);
@@ -2584,23 +2547,21 @@ class AutowiredAnnotationBeanPostProcessorTests {
 		assertThat(mixedOptionalInjectionBean.nullableBean).isNull();
 	}
 
-	private <E extends UnsatisfiedDependencyException> Consumer<E> methodParameterDeclaredOn(
-			Class<?> expected) {
+
+	private <E extends UnsatisfiedDependencyException> Consumer<E> methodParameterDeclaredOn(Class<?> expected) {
 		return declaredOn(
 				injectionPoint -> injectionPoint.getMethodParameter().getDeclaringClass(),
 				expected);
 	}
 
-	private <E extends UnsatisfiedDependencyException> Consumer<E> fieldDeclaredOn(
-			Class<?> expected) {
+	private <E extends UnsatisfiedDependencyException> Consumer<E> fieldDeclaredOn(Class<?> expected) {
 		return declaredOn(
 				injectionPoint -> injectionPoint.getField().getDeclaringClass(),
 				expected);
 	}
 
 	private <E extends UnsatisfiedDependencyException> Consumer<E> declaredOn(
-			Function<InjectionPoint, Class<?>> declaringClassExtractor,
-			Class<?> expected) {
+			Function<InjectionPoint, Class<?>> declaringClassExtractor, Class<?> expected) {
 		return ex -> {
 			InjectionPoint injectionPoint = ex.getInjectionPoint();
 			Class<?> declaringClass = declaringClassExtractor.apply(injectionPoint);
@@ -3118,15 +3079,15 @@ class AutowiredAnnotationBeanPostProcessorTests {
 
 	public static class MapConstructorInjectionBean {
 
-		private Map<String, TestBean> testBeanMap;
+		private Map<String, TestBean> testBean;  // matches bean name but should not apply shortcut
 
 		@Autowired
-		public MapConstructorInjectionBean(Map<String, TestBean> testBeanMap) {
-			this.testBeanMap = testBeanMap;
+		public MapConstructorInjectionBean(Map<String, TestBean> testBean) {
+			this.testBean = testBean;
 		}
 
-		public Map<String, TestBean> getTestBeanMap() {
-			return this.testBeanMap;
+		public Map<String, TestBean> getTestBean() {
+			return this.testBean;
 		}
 	}
 
@@ -3287,47 +3248,47 @@ class AutowiredAnnotationBeanPostProcessorTests {
 	public static class ObjectProviderInjectionBean {
 
 		@Autowired
-		private ObjectProvider<TestBean> testBeanProvider;
+		private ObjectProvider<TestBean> testBean;  // matches bean name but should not apply shortcut
 
 		private TestBean consumedTestBean;
 
 		public TestBean getTestBean() {
-			return this.testBeanProvider.getObject();
+			return this.testBean.getObject();
 		}
 
 		public TestBean getTestBean(String name) {
-			return this.testBeanProvider.getObject(name);
+			return this.testBean.getObject(name);
 		}
 
 		public TestBean getOptionalTestBean() {
-			return this.testBeanProvider.getIfAvailable();
+			return this.testBean.getIfAvailable();
 		}
 
 		public TestBean getOptionalTestBeanWithDefault() {
-			return this.testBeanProvider.getIfAvailable(() -> new TestBean("default"));
+			return this.testBean.getIfAvailable(() -> new TestBean("default"));
 		}
 
 		public TestBean consumeOptionalTestBean() {
-			this.testBeanProvider.ifAvailable(tb -> consumedTestBean = tb);
+			this.testBean.ifAvailable(tb -> consumedTestBean = tb);
 			return consumedTestBean;
 		}
 
 		public TestBean getUniqueTestBean() {
-			return this.testBeanProvider.getIfUnique();
+			return this.testBean.getIfUnique();
 		}
 
 		public TestBean getUniqueTestBeanWithDefault() {
-			return this.testBeanProvider.getIfUnique(() -> new TestBean("default"));
+			return this.testBean.getIfUnique(() -> new TestBean("default"));
 		}
 
 		public TestBean consumeUniqueTestBean() {
-			this.testBeanProvider.ifUnique(tb -> consumedTestBean = tb);
+			this.testBean.ifUnique(tb -> consumedTestBean = tb);
 			return consumedTestBean;
 		}
 
 		public List<TestBean> iterateTestBeans() {
 			List<TestBean> resolved = new ArrayList<>();
-			for (TestBean tb : this.testBeanProvider) {
+			for (TestBean tb : this.testBean) {
 				resolved.add(tb);
 			}
 			return resolved;
@@ -3335,16 +3296,16 @@ class AutowiredAnnotationBeanPostProcessorTests {
 
 		public List<TestBean> forEachTestBeans() {
 			List<TestBean> resolved = new ArrayList<>();
-			this.testBeanProvider.forEach(resolved::add);
+			this.testBean.forEach(resolved::add);
 			return resolved;
 		}
 
 		public List<TestBean> streamTestBeans() {
-			return this.testBeanProvider.stream().toList();
+			return this.testBean.stream().toList();
 		}
 
 		public List<TestBean> sortedTestBeans() {
-			return this.testBeanProvider.orderedStream().toList();
+			return this.testBean.orderedStream().toList();
 		}
 	}
 
@@ -4333,8 +4294,7 @@ class AutowiredAnnotationBeanPostProcessorTests {
 
 	static class MixedNullableInjectionBean {
 
-		@Nullable
-		public Integer nullableBean;
+		public @Nullable Integer nullableBean;
 
 		public String nonNullBean;
 
@@ -4348,8 +4308,7 @@ class AutowiredAnnotationBeanPostProcessorTests {
 
 	static class MixedOptionalInjectionBean {
 
-		@Nullable
-		public Integer nullableBean;
+		public @Nullable Integer nullableBean;
 
 		public String nonNullBean;
 

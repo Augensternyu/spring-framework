@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -303,7 +303,7 @@ class TypeDescriptorTests {
 	void fieldArray() throws Exception {
 		TypeDescriptor typeDescriptor = new TypeDescriptor(TypeDescriptorTests.class.getDeclaredField("intArray"));
 		assertThat(typeDescriptor.isArray()).isTrue();
-		assertThat(typeDescriptor.getElementTypeDescriptor().getType()).isEqualTo(Integer.TYPE);
+		assertThat(typeDescriptor.getElementTypeDescriptor().getType()).isEqualTo(int.class);
 		assertThat(typeDescriptor.toString()).isEqualTo("int[]");
 	}
 
@@ -359,7 +359,7 @@ class TypeDescriptorTests {
 		assertThat(typeDescriptor.isArray()).isFalse();
 		assertThat(typeDescriptor.isCollection()).isFalse();
 		assertThat(typeDescriptor.isMap()).isFalse();
-		assertThat(typeDescriptor.getType()).isEqualTo(Integer.TYPE);
+		assertThat(typeDescriptor.getType()).isEqualTo(int.class);
 		assertThat(typeDescriptor.getObjectType()).isEqualTo(Integer.class);
 	}
 
@@ -369,7 +369,7 @@ class TypeDescriptorTests {
 		assertThat(typeDescriptor.isArray()).isTrue();
 		assertThat(typeDescriptor.isCollection()).isFalse();
 		assertThat(typeDescriptor.isMap()).isFalse();
-		assertThat(typeDescriptor.getElementTypeDescriptor().getType()).isEqualTo(Integer.TYPE);
+		assertThat(typeDescriptor.getElementTypeDescriptor().getType()).isEqualTo(int.class);
 	}
 
 	@Test
@@ -770,6 +770,30 @@ class TypeDescriptorTests {
 		assertThat(td1).isNotEqualTo(td2);
 	}
 
+	@Test  // gh-33932
+	void recursiveType() {
+		assertThat(TypeDescriptor.valueOf(RecursiveMap.class)).isEqualTo(
+				TypeDescriptor.valueOf(RecursiveMap.class));
+
+		TypeDescriptor typeDescriptor1 = TypeDescriptor.map(Map.class,
+				TypeDescriptor.valueOf(String.class), TypeDescriptor.valueOf(RecursiveMap.class));
+		TypeDescriptor typeDescriptor2 = TypeDescriptor.map(Map.class,
+				TypeDescriptor.valueOf(String.class), TypeDescriptor.valueOf(RecursiveMap.class));
+		assertThat(typeDescriptor1).isEqualTo(typeDescriptor2);
+	}
+
+	@Test  // gh-33932
+	void recursiveTypeWithInterface() {
+		assertThat(TypeDescriptor.valueOf(RecursiveMapWithInterface.class)).isEqualTo(
+				TypeDescriptor.valueOf(RecursiveMapWithInterface.class));
+
+		TypeDescriptor typeDescriptor1 = TypeDescriptor.map(Map.class,
+				TypeDescriptor.valueOf(String.class), TypeDescriptor.valueOf(RecursiveMapWithInterface.class));
+		TypeDescriptor typeDescriptor2 = TypeDescriptor.map(Map.class,
+				TypeDescriptor.valueOf(String.class), TypeDescriptor.valueOf(RecursiveMapWithInterface.class));
+		assertThat(typeDescriptor1).isEqualTo(typeDescriptor2);
+	}
+
 
 	// Methods designed for test introspection
 
@@ -984,6 +1008,16 @@ class TypeDescriptorTests {
 		@Override
 		public void setListProperty(List<Number> t) {
 		}
+	}
+
+
+	@SuppressWarnings("serial")
+	static class RecursiveMap extends HashMap<String, RecursiveMap> {
+	}
+
+	@SuppressWarnings("serial")
+	static class RecursiveMapWithInterface extends HashMap<String, RecursiveMapWithInterface>
+			implements Map<String, RecursiveMapWithInterface> {
 	}
 
 

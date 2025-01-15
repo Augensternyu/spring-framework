@@ -21,6 +21,7 @@ import org.mockito.BDDMockito;
 
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.AnnotationConfigurationException;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.test.context.TestContext;
 
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
@@ -84,6 +85,7 @@ class SqlScriptsTestExecutionListenerTests {
 		ApplicationContext ctx = mock();
 		given(ctx.getResource(anyString())).willReturn(mock());
 		given(ctx.getAutowireCapableBeanFactory()).willReturn(mock());
+		given(ctx.getEnvironment()).willReturn(new MockEnvironment());
 
 		Class<?> clazz = IsolatedWithoutTxMgr.class;
 		BDDMockito.<Class<?>> given(testContext.getTestClass()).willReturn(clazz);
@@ -98,6 +100,7 @@ class SqlScriptsTestExecutionListenerTests {
 		ApplicationContext ctx = mock();
 		given(ctx.getResource(anyString())).willReturn(mock());
 		given(ctx.getAutowireCapableBeanFactory()).willReturn(mock());
+		given(ctx.getEnvironment()).willReturn(new MockEnvironment());
 
 		Class<?> clazz = MissingDataSourceAndTxMgr.class;
 		BDDMockito.<Class<?>> given(testContext.getTestClass()).willReturn(clazz);
@@ -135,7 +138,7 @@ class SqlScriptsTestExecutionListenerTests {
 				.withMessage("@SQL execution phase AFTER_TEST_CLASS cannot be used on methods");
 	}
 
-	private void assertExceptionContains(String msg) throws Exception {
+	private void assertExceptionContains(String msg) {
 		assertThatIllegalStateException()
 				.isThrownBy(() -> listener.beforeTestMethod(testContext))
 				.withMessageContaining(msg);

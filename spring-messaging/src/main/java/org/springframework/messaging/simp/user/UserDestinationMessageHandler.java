@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,9 +24,9 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.logging.Log;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.context.SmartLifecycle;
-import org.springframework.lang.Nullable;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHandler;
@@ -69,13 +69,13 @@ public class UserDestinationMessageHandler implements MessageHandler, SmartLifec
 
 	private final SendHelper sendHelper;
 
-	@Nullable
-	private BroadcastHandler broadcastHandler;
+	private @Nullable BroadcastHandler broadcastHandler;
 
-	@Nullable
-	private MessageHeaderInitializer headerInitializer;
+	private @Nullable MessageHeaderInitializer headerInitializer;
 
 	private volatile boolean running;
+
+	private @Nullable Integer phase;
 
 	private final Object lifecycleMonitor = new Object();
 
@@ -124,8 +124,7 @@ public class UserDestinationMessageHandler implements MessageHandler, SmartLifec
 	/**
 	 * Return the configured destination for unresolved messages.
 	 */
-	@Nullable
-	public String getBroadcastDestination() {
+	public @Nullable String getBroadcastDestination() {
 		return (this.broadcastHandler != null ? this.broadcastHandler.getBroadcastDestination() : null);
 	}
 
@@ -149,9 +148,23 @@ public class UserDestinationMessageHandler implements MessageHandler, SmartLifec
 	/**
 	 * Return the configured header initializer.
 	 */
-	@Nullable
-	public MessageHeaderInitializer getHeaderInitializer() {
+	public @Nullable MessageHeaderInitializer getHeaderInitializer() {
 		return this.headerInitializer;
+	}
+
+	/**
+	 * Set the phase that this handler should run in.
+	 * <p>By default, this is {@link SmartLifecycle#DEFAULT_PHASE}, but with
+	 * {@code @EnableWebSocketMessageBroker} configuration it is set to 0.
+	 * @since 6.1.4
+	 */
+	public void setPhase(int phase) {
+		this.phase = phase;
+	}
+
+	@Override
+	public int getPhase() {
+		return (this.phase != null ? this.phase : SmartLifecycle.super.getPhase());
 	}
 
 
@@ -244,8 +257,7 @@ public class UserDestinationMessageHandler implements MessageHandler, SmartLifec
 
 		private final MessageSendingOperations<String> messagingTemplate;
 
-		@Nullable
-		private final Map<String, MessageSendingOperations<String>> orderedMessagingTemplates;
+		private final @Nullable Map<String, MessageSendingOperations<String>> orderedMessagingTemplates;
 
 		SendHelper(MessageChannel clientInboundChannel, MessageChannel brokerChannel) {
 			this.brokerChannel = brokerChannel;
@@ -316,8 +328,7 @@ public class UserDestinationMessageHandler implements MessageHandler, SmartLifec
 			return this.broadcastDestination;
 		}
 
-		@Nullable
-		public Message<?> preHandle(Message<?> message) throws MessagingException {
+		public @Nullable Message<?> preHandle(Message<?> message) throws MessagingException {
 			String destination = SimpMessageHeaderAccessor.getDestination(message.getHeaders());
 			if (!getBroadcastDestination().equals(destination)) {
 				return message;

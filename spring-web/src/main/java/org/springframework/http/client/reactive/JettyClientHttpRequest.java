@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -143,7 +143,7 @@ class JettyClientHttpRequest extends AbstractClientHttpRequest {
 		HttpHeaders headers = getHeaders();
 		this.jettyRequest.headers(fields -> {
 			headers.forEach((key, value) -> value.forEach(v -> fields.add(key, v)));
-			if (!headers.containsKey(HttpHeaders.ACCEPT)) {
+			if (!headers.containsHeader(HttpHeaders.ACCEPT)) {
 				fields.add(HttpHeaders.ACCEPT, "*/*");
 			}
 		});
@@ -152,6 +152,15 @@ class JettyClientHttpRequest extends AbstractClientHttpRequest {
 	@Override
 	protected HttpHeaders initReadOnlyHeaders() {
 		return HttpHeaders.readOnlyHttpHeaders(new JettyHeadersAdapter(this.jettyRequest.getHeaders()));
+	}
+
+	@Override
+	protected void applyAttributes() {
+		getAttributes().forEach((key, value) -> {
+			if (this.jettyRequest.getAttributes().get(key) == null) {
+				this.jettyRequest.attribute(key, value);
+			}
+		});
 	}
 
 	public ReactiveRequest toReactiveRequest() {

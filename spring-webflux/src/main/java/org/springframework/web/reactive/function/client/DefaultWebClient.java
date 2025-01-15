@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,6 +34,7 @@ import java.util.function.Predicate;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import io.micrometer.observation.contextpropagation.ObservationThreadLocalAccessor;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -48,7 +49,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.reactive.ClientHttpRequest;
 import org.springframework.http.client.reactive.ClientHttpResponse;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.LinkedMultiValueMap;
@@ -83,26 +83,21 @@ final class DefaultWebClient implements WebClient {
 
 	private final ExchangeFunction exchangeFunction;
 
-	@Nullable
-	private final ExchangeFilterFunction filterFunctions;
+	private final @Nullable ExchangeFilterFunction filterFunctions;
 
 	private final UriBuilderFactory uriBuilderFactory;
 
-	@Nullable
-	private final HttpHeaders defaultHeaders;
+	private final @Nullable HttpHeaders defaultHeaders;
 
-	@Nullable
-	private final MultiValueMap<String, String> defaultCookies;
+	private final @Nullable MultiValueMap<String, String> defaultCookies;
 
-	@Nullable
-	private final Consumer<RequestHeadersSpec<?>> defaultRequest;
+	private final @Nullable Consumer<RequestHeadersSpec<?>> defaultRequest;
 
 	private final List<DefaultResponseSpec.StatusHandler> defaultStatusHandlers;
 
 	private final ObservationRegistry observationRegistry;
 
-	@Nullable
-	private final ClientRequestObservationConvention observationConvention;
+	private final @Nullable ClientRequestObservationConvention observationConvention;
 
 	private final DefaultWebClientBuilder builder;
 
@@ -177,7 +172,11 @@ final class DefaultWebClient implements WebClient {
 	}
 
 	private RequestBodyUriSpec methodInternal(HttpMethod httpMethod) {
-		return new DefaultRequestBodyUriSpec(httpMethod);
+		DefaultRequestBodyUriSpec spec = new DefaultRequestBodyUriSpec(httpMethod);
+		if (this.defaultRequest != null) {
+			this.defaultRequest.accept(spec);
+		}
+		return spec;
 	}
 
 	@Override
@@ -198,32 +197,26 @@ final class DefaultWebClient implements WebClient {
 
 		private final HttpMethod httpMethod;
 
-		@Nullable
-		private URI uri;
+		private @Nullable URI uri;
 
-		@Nullable
-		private HttpHeaders headers;
+		private @Nullable HttpHeaders headers;
 
-		@Nullable
-		private MultiValueMap<String, String> cookies;
+		private @Nullable MultiValueMap<String, String> cookies;
 
-		@Nullable
-		private BodyInserter<?, ? super ClientHttpRequest> inserter;
+		private @Nullable BodyInserter<?, ? super ClientHttpRequest> inserter;
 
 		private final Map<String, Object> attributes = new LinkedHashMap<>(4);
 
-		@Nullable
-		private Function<Context, Context> contextModifier;
+		private @Nullable Function<Context, Context> contextModifier;
 
-		@Nullable
-		private Consumer<ClientHttpRequest> httpRequestConsumer;
+		private @Nullable Consumer<ClientHttpRequest> httpRequestConsumer;
 
 		DefaultRequestBodyUriSpec(HttpMethod httpMethod) {
 			this.httpMethod = httpMethod;
 		}
 
 		@Override
-		public RequestBodySpec uri(String uriTemplate, Object... uriVariables) {
+		public RequestBodySpec uri(String uriTemplate, @Nullable Object... uriVariables) {
 			UriBuilder uriBuilder = uriBuilderFactory.uriString(uriTemplate);
 			attribute(URI_TEMPLATE_ATTRIBUTE, uriBuilder.toUriString());
 			return uri(uriBuilder.build(uriVariables));
@@ -231,14 +224,16 @@ final class DefaultWebClient implements WebClient {
 
 		@Override
 		public RequestBodySpec uri(String uriTemplate, Map<String, ?> uriVariables) {
-			attribute(URI_TEMPLATE_ATTRIBUTE, uriTemplate);
-			return uri(uriBuilderFactory.expand(uriTemplate, uriVariables));
+			UriBuilder uriBuilder = uriBuilderFactory.uriString(uriTemplate);
+			attribute(URI_TEMPLATE_ATTRIBUTE, uriBuilder.toUriString());
+			return uri(uriBuilder.build(uriVariables));
 		}
 
 		@Override
 		public RequestBodySpec uri(String uriTemplate, Function<UriBuilder, URI> uriFunction) {
-			attribute(URI_TEMPLATE_ATTRIBUTE, uriTemplate);
-			return uri(uriFunction.apply(uriBuilderFactory.uriString(uriTemplate)));
+			UriBuilder uriBuilder = uriBuilderFactory.uriString(uriTemplate);
+			attribute(URI_TEMPLATE_ATTRIBUTE, uriBuilder.toUriString());
+			return uri(uriFunction.apply(uriBuilder));
 		}
 
 		@Override
@@ -362,6 +357,12 @@ final class DefaultWebClient implements WebClient {
 		}
 
 		@Override
+		public <T> RequestHeadersSpec<?> bodyValue(T body, ParameterizedTypeReference<T> bodyType) {
+			this.inserter = BodyInserters.fromValue(body, bodyType);
+			return this;
+		}
+
+		@Override
 		public <T, P extends Publisher<T>> RequestHeadersSpec<?> body(
 				P publisher, ParameterizedTypeReference<T> elementTypeRef) {
 			this.inserter = BodyInserters.fromPublisher(publisher, elementTypeRef);
@@ -448,13 +449,12 @@ final class DefaultWebClient implements WebClient {
 				if (filterFunctions != null) {
 					filterFunction = filterFunctions.andThen(filterFunction);
 				}
-				ClientRequest request = requestBuilder
-						.attribute(ClientRequestObservationContext.CURRENT_OBSERVATION_CONTEXT_ATTRIBUTE, observationContext)
-						.build();
+				ClientRequest request = requestBuilder.build();
 				observationContext.setUriTemplate((String) request.attribute(URI_TEMPLATE_ATTRIBUTE).orElse(null));
 				observationContext.setRequest(request);
-				Mono<ClientResponse> responseMono = filterFunction.apply(exchangeFunction)
-						.exchange(request)
+				final ExchangeFilterFunction finalFilterFunction = filterFunction;
+				Mono<ClientResponse> responseMono = Mono.defer(
+								() -> finalFilterFunction.apply(exchangeFunction).exchange(request))
 						.checkpoint("Request to " +
 								WebClientUtils.getRequestDescription(request.method(), request.url()) +
 								" [DefaultWebClient]")
@@ -465,7 +465,7 @@ final class DefaultWebClient implements WebClient {
 				final AtomicBoolean responseReceived = new AtomicBoolean();
 				return responseMono
 						.doOnNext(response -> responseReceived.set(true))
-						.doOnError(observationContext::setError)
+						.doOnError(observation::error)
 						.doFinally(signalType -> {
 							if (signalType == SignalType.CANCEL && !responseReceived.get()) {
 								observationContext.setAborted(true);
@@ -477,9 +477,6 @@ final class DefaultWebClient implements WebClient {
 		}
 
 		private ClientRequest.Builder initRequestBuilder() {
-			if (defaultRequest != null) {
-				defaultRequest.accept(this);
-			}
 			ClientRequest.Builder builder = ClientRequest.create(this.httpMethod, initUri())
 					.headers(this::initHeaders)
 					.cookies(this::initCookies)
@@ -498,10 +495,10 @@ final class DefaultWebClient implements WebClient {
 		}
 
 		private void initHeaders(HttpHeaders out) {
-			if (!CollectionUtils.isEmpty(defaultHeaders)) {
+			if (defaultHeaders != null && !defaultHeaders.isEmpty()) {
 				out.putAll(defaultHeaders);
 			}
-			if (!CollectionUtils.isEmpty(this.headers)) {
+			if (this.headers != null && !this.headers.isEmpty()) {
 				out.putAll(this.headers);
 			}
 		}
@@ -676,8 +673,7 @@ final class DefaultWebClient implements WebClient {
 			return t -> response.createException().flatMap(ex -> Mono.error(ex.initCause(t)));
 		}
 
-		@Nullable
-		private <T> Mono<T> applyStatusHandlers(ClientResponse response) {
+		private <T> @Nullable Mono<T> applyStatusHandlers(ClientResponse response) {
 			HttpStatusCode statusCode = response.statusCode();
 			for (StatusHandler handler : this.statusHandlers) {
 				if (handler.test(statusCode)) {

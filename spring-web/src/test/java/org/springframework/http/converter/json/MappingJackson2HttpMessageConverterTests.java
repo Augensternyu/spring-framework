@@ -39,13 +39,13 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.ser.FilterProvider;
 import com.fasterxml.jackson.databind.ser.impl.SimpleBeanPropertyFilter;
 import com.fasterxml.jackson.databind.ser.impl.SimpleFilterProvider;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.skyscreamer.jsonassert.JSONAssert;
 
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.lang.Nullable;
 import org.springframework.web.testfixture.http.MockHttpInputMessage;
 import org.springframework.web.testfixture.http.MockHttpOutputMessage;
 
@@ -62,8 +62,6 @@ import static org.assertj.core.api.Assertions.within;
  * @author Juergen Hoeller
  */
 class MappingJackson2HttpMessageConverterTests {
-
-	protected static final String NEWLINE_SYSTEM_PROPERTY = System.lineSeparator();
 
 	private final MappingJackson2HttpMessageConverter converter = new MappingJackson2HttpMessageConverter();
 
@@ -108,7 +106,7 @@ class MappingJackson2HttpMessageConverterTests {
 	}
 
 	@Test  // SPR-7905
-	public void canReadAndWriteMicroformats() {
+	void canReadAndWriteMicroformats() {
 		assertThat(converter.canRead(MyBean.class, new MediaType("application", "vnd.test-micro-type+json"))).isTrue();
 		assertThat(converter.canWrite(MyBean.class, new MediaType("application", "vnd.test-micro-type+json"))).isTrue();
 	}
@@ -151,7 +149,7 @@ class MappingJackson2HttpMessageConverterTests {
 
 	@Test
 	@SuppressWarnings("unchecked")
-	public void readUntyped() throws IOException {
+	void readUntyped() throws IOException {
 		String body = "{" +
 				"\"bytes\":\"AQI=\"," +
 				"\"array\":[\"Foo\",\"Bar\"]," +
@@ -247,7 +245,7 @@ class MappingJackson2HttpMessageConverterTests {
 
 	@Test
 	@SuppressWarnings("unchecked")
-	public void readAndWriteGenerics() throws Exception {
+	void readAndWriteGenerics() throws Exception {
 		MappingJackson2HttpMessageConverter converter = new MappingJackson2HttpMessageConverter() {
 			@Override
 			protected JavaType getJavaType(Type type, @Nullable Class<?> contextClass) {
@@ -286,7 +284,7 @@ class MappingJackson2HttpMessageConverterTests {
 
 	@Test
 	@SuppressWarnings("unchecked")
-	public void readAndWriteParameterizedType() throws Exception {
+	void readAndWriteParameterizedType() throws Exception {
 		ParameterizedTypeReference<List<MyBean>> beansList = new ParameterizedTypeReference<>() {};
 
 		String body = "[{" +
@@ -317,7 +315,7 @@ class MappingJackson2HttpMessageConverterTests {
 
 	@Test
 	@SuppressWarnings("unchecked")
-	public void writeParameterizedBaseType() throws Exception {
+	void writeParameterizedBaseType() throws Exception {
 		ParameterizedTypeReference<List<MyBean>> beansList = new ParameterizedTypeReference<>() {};
 		ParameterizedTypeReference<List<MyBase>> baseList = new ParameterizedTypeReference<>() {};
 
@@ -369,8 +367,10 @@ class MappingJackson2HttpMessageConverterTests {
 		this.converter.writeInternal(bean, null, outputMessage);
 		String result = outputMessage.getBodyAsString(StandardCharsets.UTF_8);
 
-		assertThat(result).isEqualTo(("{" + NEWLINE_SYSTEM_PROPERTY +
-				"  \"name\" : \"Jason\"" + NEWLINE_SYSTEM_PROPERTY + "}"));
+		assertThat(result).isEqualToNormalizingNewlines("""
+			{
+			\s "name" : "Jason"
+			}""");
 	}
 
 	@Test
@@ -460,7 +460,7 @@ class MappingJackson2HttpMessageConverterTests {
 	}
 
 	@Test  // SPR-13318
-	public void writeSubType() throws Exception {
+	void writeSubType() throws Exception {
 		MockHttpOutputMessage outputMessage = new MockHttpOutputMessage();
 		MyBean bean = new MyBean();
 		bean.setString("Foo");
@@ -474,7 +474,7 @@ class MappingJackson2HttpMessageConverterTests {
 	}
 
 	@Test  // SPR-13318
-	public void writeSubTypeList() throws Exception {
+	void writeSubTypeList() throws Exception {
 		MockHttpOutputMessage outputMessage = new MockHttpOutputMessage();
 		List<MyBean> beans = new ArrayList<>();
 		MyBean foo = new MyBean();
@@ -498,7 +498,7 @@ class MappingJackson2HttpMessageConverterTests {
 	}
 
 	@Test // gh-27511
-	public void readWithNoDefaultConstructor() throws Exception {
+	void readWithNoDefaultConstructor() throws Exception {
 		String body = "{\"property1\":\"foo\",\"property2\":\"bar\"}";
 		MockHttpInputMessage inputMessage = new MockHttpInputMessage(body.getBytes(StandardCharsets.UTF_8));
 		inputMessage.getHeaders().setContentType(MediaType.APPLICATION_JSON);
@@ -510,7 +510,7 @@ class MappingJackson2HttpMessageConverterTests {
 
 	@Test
 	@SuppressWarnings("unchecked")
-	public void readNonUnicode() throws Exception {
+	void readNonUnicode() throws Exception {
 		String body = "{\"føø\":\"bår\"}";
 		Charset charset = StandardCharsets.ISO_8859_1;
 		MockHttpInputMessage inputMessage = new MockHttpInputMessage(body.getBytes(charset));
@@ -522,7 +522,7 @@ class MappingJackson2HttpMessageConverterTests {
 
 	@Test
 	@SuppressWarnings("unchecked")
-	public void readAscii() throws Exception {
+	void readAscii() throws Exception {
 		String body = "{\"foo\":\"bar\"}";
 		Charset charset = StandardCharsets.US_ASCII;
 		MockHttpInputMessage inputMessage = new MockHttpInputMessage(body.getBytes(charset));
@@ -533,7 +533,7 @@ class MappingJackson2HttpMessageConverterTests {
 	}
 
 	@Test
-	public void writeAscii() throws Exception {
+	void writeAscii() throws Exception {
 		MockHttpOutputMessage outputMessage = new MockHttpOutputMessage();
 		Map<String,Object> body = new HashMap<>();
 		body.put("foo", "bar");

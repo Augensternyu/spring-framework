@@ -19,13 +19,17 @@ package org.springframework.context.expression;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanExpressionException;
 import org.springframework.beans.factory.config.BeanExpressionContext;
 import org.springframework.beans.factory.config.BeanExpressionResolver;
+import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 import org.springframework.core.SpringProperties;
 import org.springframework.core.convert.ConversionService;
 import org.springframework.core.convert.support.DefaultConversionService;
+import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.Expression;
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.ParserContext;
@@ -34,7 +38,6 @@ import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.expression.spel.support.StandardTypeConverter;
 import org.springframework.expression.spel.support.StandardTypeLocator;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
@@ -153,34 +156,30 @@ public class StandardBeanExpressionResolver implements BeanExpressionResolver {
 
 
 	@Override
-	@Nullable
-	public Object evaluate(@Nullable String value, BeanExpressionContext beanExpressionContext) throws BeansException {
+	public @Nullable Object evaluate(@Nullable String value, BeanExpressionContext beanExpressionContext) throws BeansException {
 		if (!StringUtils.hasLength(value)) {
 			return value;
 		}
 		try {
-			Expression expr = this.expressionCache.get(value);
-			if (expr == null) {
-				expr = this.expressionParser.parseExpression(value, this.beanExpressionParserContext);
-				this.expressionCache.put(value, expr);
-			}
-			StandardEvaluationContext sec = this.evaluationCache.get(beanExpressionContext);
-			if (sec == null) {
-				sec = new StandardEvaluationContext(beanExpressionContext);
-				sec.addPropertyAccessor(new BeanExpressionContextAccessor());
-				sec.addPropertyAccessor(new BeanFactoryAccessor());
-				sec.addPropertyAccessor(new MapAccessor());
-				sec.addPropertyAccessor(new EnvironmentAccessor());
-				sec.setBeanResolver(new BeanFactoryResolver(beanExpressionContext.getBeanFactory()));
-				sec.setTypeLocator(new StandardTypeLocator(beanExpressionContext.getBeanFactory().getBeanClassLoader()));
-				sec.setTypeConverter(new StandardTypeConverter(() -> {
-					ConversionService cs = beanExpressionContext.getBeanFactory().getConversionService();
-					return (cs != null ? cs : DefaultConversionService.getSharedInstance());
-				}));
-				customizeEvaluationContext(sec);
-				this.evaluationCache.put(beanExpressionContext, sec);
-			}
-			return expr.getValue(sec);
+			Expression expr = this.expressionCache.computeIfAbsent(value, expression ->
+					this.expressionParser.parseExpression(expression, this.beanExpressionParserContext));
+			EvaluationContext evalContext = this.evaluationCache.computeIfAbsent(beanExpressionContext, bec -> {
+					ConfigurableBeanFactory beanFactory = bec.getBeanFactory();
+					StandardEvaluationContext sec = new StandardEvaluationContext(bec);
+					sec.addPropertyAccessor(new BeanExpressionContextAccessor());
+					sec.addPropertyAccessor(new BeanFactoryAccessor());
+					sec.addPropertyAccessor(new MapAccessor());
+					sec.addPropertyAccessor(new EnvironmentAccessor());
+					sec.setBeanResolver(new BeanFactoryResolver(beanFactory));
+					sec.setTypeLocator(new StandardTypeLocator(beanFactory.getBeanClassLoader()));
+					sec.setTypeConverter(new StandardTypeConverter(() -> {
+						ConversionService cs = beanFactory.getConversionService();
+						return (cs != null ? cs : DefaultConversionService.getSharedInstance());
+					}));
+					customizeEvaluationContext(sec);
+					return sec;
+				});
+			return expr.getValue(evalContext);
 		}
 		catch (Throwable ex) {
 			throw new BeanExpressionException("Expression parsing failed", ex);

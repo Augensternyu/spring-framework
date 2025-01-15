@@ -42,6 +42,7 @@ import org.springframework.util.MultiValueMap;
 import static java.util.Map.entry;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.assertj.core.api.InstanceOfAssertFactories.LIST;
 
 /**
  * @author Juergen Hoeller
@@ -81,9 +82,9 @@ class BeanWrapperGenericsTests {
 		BeanWrapper bw = new BeanWrapperImpl(gb);
 		Set<TestBean> input = new HashSet<>();
 		input.add(new TestBean());
-		assertThatExceptionOfType(TypeMismatchException.class).isThrownBy(() ->
-				bw.setPropertyValue("integerSet", input))
-			.withMessageContaining("java.lang.Integer");
+		assertThatExceptionOfType(TypeMismatchException.class)
+				.isThrownBy(() -> bw.setPropertyValue("integerSet", input))
+				.withMessageContaining("java.lang.Integer");
 	}
 
 	@Test
@@ -94,8 +95,8 @@ class BeanWrapperGenericsTests {
 		input.add("http://localhost:8080");
 		input.add("http://localhost:9090");
 		bw.setPropertyValue("resourceList", input);
-		assertThat(gb.getResourceList()).element(0).isEqualTo(new UrlResource("http://localhost:8080"));
-		assertThat(gb.getResourceList()).element(1).isEqualTo(new UrlResource("http://localhost:9090"));
+		assertThat(gb.getResourceList()).containsExactly(new UrlResource("http://localhost:8080"),
+				new UrlResource("http://localhost:9090"));
 	}
 
 	@Test
@@ -104,7 +105,7 @@ class BeanWrapperGenericsTests {
 		gb.setResourceList(new ArrayList<>());
 		BeanWrapper bw = new BeanWrapperImpl(gb);
 		bw.setPropertyValue("resourceList[0]", "http://localhost:8080");
-		assertThat(gb.getResourceList()).element(0).isEqualTo(new UrlResource("http://localhost:8080"));
+		assertThat(gb.getResourceList()).containsExactly(new UrlResource("http://localhost:8080"));
 	}
 
 	@Test
@@ -144,7 +145,7 @@ class BeanWrapperGenericsTests {
 	@Test
 	void testGenericMapElementWithKeyType() {
 		GenericBean<?> gb = new GenericBean<>();
-		gb.setLongMap(new HashMap<Long, Integer>());
+		gb.setLongMap(new HashMap<>());
 		BeanWrapper bw = new BeanWrapperImpl(gb);
 		bw.setPropertyValue("longMap[4]", "5");
 		assertThat(gb.getLongMap().get(Long.valueOf("4"))).isEqualTo("5");
@@ -201,7 +202,7 @@ class BeanWrapperGenericsTests {
 		BeanWrapper bw = new BeanWrapperImpl(gb);
 		bw.setPropertyValue("listOfLists[0][0]", 5);
 		assertThat(bw.getPropertyValue("listOfLists[0][0]")).isEqualTo(5);
-		assertThat(gb.getListOfLists()).singleElement().asList().containsExactly(5);
+		assertThat(gb.getListOfLists()).singleElement().asInstanceOf(LIST).containsExactly(5);
 	}
 
 	@Test
@@ -213,7 +214,7 @@ class BeanWrapperGenericsTests {
 		BeanWrapper bw = new BeanWrapperImpl(gb);
 		bw.setPropertyValue("listOfLists[0][0]", "5");
 		assertThat(bw.getPropertyValue("listOfLists[0][0]")).isEqualTo(5);
-		assertThat(gb.getListOfLists()).singleElement().asList().containsExactly(5);
+		assertThat(gb.getListOfLists()).singleElement().asInstanceOf(LIST).containsExactly(5);
 	}
 
 	@Test

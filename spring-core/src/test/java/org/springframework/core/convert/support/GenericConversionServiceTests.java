@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.core.convert.ConversionFailedException;
@@ -41,7 +42,6 @@ import org.springframework.core.convert.converter.ConverterFactory;
 import org.springframework.core.convert.converter.GenericConverter;
 import org.springframework.core.io.DescriptiveResource;
 import org.springframework.core.io.Resource;
-import org.springframework.lang.Nullable;
 import org.springframework.util.StringUtils;
 
 import static java.util.Comparator.naturalOrder;
@@ -461,12 +461,12 @@ class GenericConversionServiceTests {
 		assertThat(converter.getSourceTypes().stream().allMatch(td -> Integer.class.equals(td.getType()))).isTrue();
 	}
 
-	@Test
+	@Test  // gh-14200, SPR-9566
 	void convertOptimizeArray() {
-		// SPR-9566
 		byte[] byteArray = new byte[] { 1, 2, 3 };
 		byte[] converted = conversionService.convert(byteArray, byte[].class);
 		assertThat(converted).isSameAs(byteArray);
+		assertThat(converted).containsExactly(1, 2, 3);
 	}
 
 	@Test
@@ -485,7 +485,7 @@ class GenericConversionServiceTests {
 	void enumWithInterfaceToStringConversion() {
 		// SPR-9692
 		conversionService.addConverter(new EnumToStringConverter(conversionService));
-		conversionService.addConverter(new MyEnumInterfaceToStringConverter<MyEnum>());
+		conversionService.addConverter(new MyEnumInterfaceToStringConverter<>());
 		assertThat(conversionService.convert(MyEnum.A, String.class)).isEqualTo("1");
 	}
 
@@ -681,8 +681,7 @@ class GenericConversionServiceTests {
 		}
 
 		@Override
-		@Nullable
-		public Object convert(@Nullable Object source, TypeDescriptor sourceType, TypeDescriptor targetType) {
+		public @Nullable Object convert(@Nullable Object source, TypeDescriptor sourceType, TypeDescriptor targetType) {
 			return null;
 		}
 	}
@@ -704,8 +703,7 @@ class GenericConversionServiceTests {
 		}
 
 		@Override
-		@Nullable
-		public Object convert(@Nullable Object source, TypeDescriptor sourceType, TypeDescriptor targetType) {
+		public @Nullable Object convert(@Nullable Object source, TypeDescriptor sourceType, TypeDescriptor targetType) {
 			return null;
 		}
 

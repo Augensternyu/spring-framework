@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
@@ -46,7 +47,6 @@ import org.springframework.core.annotation.Order;
 import org.springframework.core.env.Environment;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.core.type.AnnotationMetadata;
-import org.springframework.lang.Nullable;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
@@ -92,6 +92,17 @@ public class ImportSelectorTests {
 	}
 
 	@Test
+	void filteredImportSelector() {
+		AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+		context.register(FilteredConfig.class);
+		context.refresh();
+		String[] beanNames = context.getBeanFactory().getBeanDefinitionNames();
+		assertThat(beanNames).endsWith("importSelectorTests.FilteredConfig",
+				ImportedSelector2.class.getName(), "b");
+		assertThat(beanNames).doesNotContain("a", Object.class.getName(), "c");
+	}
+
+	@Test
 	void invokeAwareMethodsInImportSelector() {
 		AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AwareConfig.class);
 		assertThat(SampleImportSelector.beanFactory).isEqualTo(context.getBeanFactory());
@@ -126,8 +137,7 @@ public class ImportSelectorTests {
 		ordered.verify(beanFactory).registerBeanDefinition(eq("c"), any());
 		ordered.verify(beanFactory).registerBeanDefinition(eq("d"), any());
 		assertThat(TestImportGroup.instancesCount.get()).isEqualTo(1);
-		assertThat(TestImportGroup.imports).hasSize(1);
-		assertThat(TestImportGroup.imports.values()).element(0).asInstanceOf(LIST).hasSize(2);
+		assertThat(TestImportGroup.imports.values()).singleElement().asInstanceOf(LIST).hasSize(2);
 	}
 
 	@Test
@@ -275,6 +285,25 @@ public class ImportSelectorTests {
 		}
 	}
 
+	@Configuration
+	@Import(FilteredImportSelector.class)
+	public static class FilteredConfig {
+	}
+
+	public static class FilteredImportSelector implements ImportSelector {
+
+		@Override
+		public String[] selectImports(AnnotationMetadata importingClassMetadata) {
+			return new String[] { ImportedSelector1.class.getName(), ImportedSelector2.class.getName(), ImportedSelector3.class.getName() };
+		}
+
+		@Override
+		public Predicate<String> getExclusionFilter() {
+			return (className -> className.equals(ImportedSelector1.class.getName()) ||
+					className.equals(ImportedSelector3.class.getName()));
+		}
+	}
+
 
 	public static class DeferredImportSelector1 implements DeferredImportSelector, Ordered {
 
@@ -318,6 +347,15 @@ public class ImportSelectorTests {
 		@Bean
 		public String b() {
 			return "b";
+		}
+	}
+
+	@Configuration
+	public static class ImportedSelector3 {
+
+		@Bean
+		public String c() {
+			return "c";
 		}
 	}
 
@@ -365,8 +403,7 @@ public class ImportSelectorTests {
 		}
 
 		@Override
-		@Nullable
-		public Predicate<String> getExclusionFilter() {
+		public @Nullable Predicate<String> getExclusionFilter() {
 			return className -> className.endsWith("ImportedSelector1");
 		}
 	}
@@ -402,18 +439,16 @@ public class ImportSelectorTests {
 
 	public static class GroupedDeferredImportSelector1 extends DeferredImportSelector1 {
 
-		@Nullable
 		@Override
-		public Class<? extends Group> getImportGroup() {
+		public @Nullable Class<? extends Group> getImportGroup() {
 			return TestImportGroup.class;
 		}
 	}
 
 	public static class GroupedDeferredImportSelector2 extends DeferredImportSelector2 {
 
-		@Nullable
 		@Override
-		public Class<? extends Group> getImportGroup() {
+		public @Nullable Class<? extends Group> getImportGroup() {
 			return TestImportGroup.class;
 		}
 	}
@@ -433,9 +468,8 @@ public class ImportSelectorTests {
 			return new String[] { DeferredImportSelector1.class.getName(), ChildConfiguration1.class.getName() };
 		}
 
-		@Nullable
 		@Override
-		public Class<? extends DeferredImportSelector.Group> getImportGroup() {
+		public @Nullable Class<? extends DeferredImportSelector.Group> getImportGroup() {
 			return TestImportGroup.class;
 		}
 
@@ -454,9 +488,8 @@ public class ImportSelectorTests {
 			return new String[] { DeferredImportSelector2.class.getName(), ChildConfiguration2.class.getName() };
 		}
 
-		@Nullable
 		@Override
-		public Class<? extends DeferredImportSelector.Group> getImportGroup() {
+		public @Nullable Class<? extends DeferredImportSelector.Group> getImportGroup() {
 			return TestImportGroup.class;
 		}
 
@@ -477,9 +510,8 @@ public class ImportSelectorTests {
 			return new String[] { DeferredImportedSelector3.class.getName() };
 		}
 
-		@Nullable
 		@Override
-		public Class<? extends DeferredImportSelector.Group> getImportGroup() {
+		public @Nullable Class<? extends DeferredImportSelector.Group> getImportGroup() {
 			return TestImportGroup.class;
 		}
 
@@ -499,9 +531,8 @@ public class ImportSelectorTests {
 			return new String[] { DeferredImportSelector2.class.getName() };
 		}
 
-		@Nullable
 		@Override
-		public Class<? extends DeferredImportSelector.Group> getImportGroup() {
+		public @Nullable Class<? extends DeferredImportSelector.Group> getImportGroup() {
 			return TestImportGroup.class;
 		}
 

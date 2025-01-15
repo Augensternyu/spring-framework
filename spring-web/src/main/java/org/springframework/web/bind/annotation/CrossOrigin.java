@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ import org.springframework.web.cors.CorsConfiguration;
  * {@link CorsConfiguration#applyPermitDefaultValues()}.
  *
  * <p>The rules for combining global and local configuration are generally
- * additive -- e.g. all global and all local origins. For those attributes
+ * additive -- for example, all global and all local origins. For those attributes
  * where only a single value can be accepted such as {@code allowCredentials}
  * and {@code maxAge}, the local overrides the global value.
  * See {@link CorsConfiguration#combine(CorsConfiguration)} for more details.
@@ -120,7 +120,7 @@ public @interface CrossOrigin {
 	 * Whether private network access is supported. Please, see
 	 * {@link CorsConfiguration#setAllowPrivateNetwork(Boolean)} for details.
 	 * <p>By default this is not set (i.e. private network access is not supported).
-	 * @since 6.1.3
+	 * @since 5.3.32
 	 */
 	String allowPrivateNetwork() default "";
 

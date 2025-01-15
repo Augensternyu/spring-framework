@@ -36,6 +36,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.beans.BeanWrapper;
@@ -62,7 +63,6 @@ import org.springframework.format.Formatter;
 import org.springframework.format.number.NumberStyleFormatter;
 import org.springframework.format.support.DefaultFormattingConversionService;
 import org.springframework.format.support.FormattingConversionService;
-import org.springframework.lang.Nullable;
 import org.springframework.tests.sample.beans.BeanWithObjectProperty;
 import org.springframework.util.StringUtils;
 
@@ -2054,7 +2054,7 @@ class DataBinderTests {
 			.withMessageContaining("DataBinder is already initialized - call setAutoGrowCollectionLimit before other configuration methods");
 	}
 
-	@Test // SPR-15009
+	@Test  // SPR-15009
 	void setCustomMessageCodesResolverBeforeInitializeBindingResultForBeanPropertyAccess() {
 		TestBean testBean = new TestBean();
 		DataBinder binder = new DataBinder(testBean, "testBean");
@@ -2071,7 +2071,7 @@ class DataBinderTests {
 		assertThat(((BeanWrapper) binder.getInternalBindingResult().getPropertyAccessor()).getAutoGrowCollectionLimit()).isEqualTo(512);
 	}
 
-	@Test // SPR-15009
+	@Test  // SPR-15009
 	void setCustomMessageCodesResolverBeforeInitializeBindingResultForDirectFieldAccess() {
 		TestBean testBean = new TestBean();
 		DataBinder binder = new DataBinder(testBean, "testBean");
@@ -2125,7 +2125,7 @@ class DataBinderTests {
 			.withMessageContaining("DataBinder is already initialized with MessageCodesResolver");
 	}
 
-	@Test // gh-24347
+	@Test  // gh-24347
 	void overrideBindingResultType() {
 		TestBean testBean = new TestBean();
 		DataBinder binder = new DataBinder(testBean, "testBean");

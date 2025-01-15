@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,18 +20,17 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.beans.BeanInstantiationException;
 import org.springframework.beans.BeanUtils;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
-import org.springframework.lang.Nullable;
 import org.springframework.test.context.BootstrapContext;
 import org.springframework.test.context.CacheAwareContextLoaderDelegate;
 import org.springframework.test.context.ContextConfiguration;
@@ -53,6 +52,7 @@ import org.springframework.test.context.TestExecutionListeners.MergeMode;
 import org.springframework.test.context.util.TestContextSpringFactoriesUtils;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 /**
@@ -79,8 +79,7 @@ public abstract class AbstractTestContextBootstrapper implements TestContextBoot
 
 	private final Log logger = LogFactory.getLog(getClass());
 
-	@Nullable
-	private BootstrapContext bootstrapContext;
+	private @Nullable BootstrapContext bootstrapContext;
 
 
 	@Override
@@ -355,7 +354,7 @@ public abstract class AbstractTestContextBootstrapper implements TestContextBoot
 			List<ContextConfigurationAttributes> configAttributes) {
 
 		List<ContextCustomizerFactory> factories = getContextCustomizerFactories(testClass);
-		Set<ContextCustomizer> customizers = new LinkedHashSet<>(factories.size());
+		Set<ContextCustomizer> customizers = CollectionUtils.newLinkedHashSet(factories.size());
 		for (ContextCustomizerFactory factory : factories) {
 			ContextCustomizer customizer = factory.createContextCustomizer(testClass, configAttributes);
 			if (customizer != null) {
@@ -533,8 +532,7 @@ public abstract class AbstractTestContextBootstrapper implements TestContextBoot
 	 * @throws IllegalArgumentException if supplied configuration attributes are
 	 * {@code null} or <em>empty</em>
 	 */
-	@Nullable
-	protected Class<? extends ContextLoader> resolveExplicitContextLoaderClass(
+	protected @Nullable Class<? extends ContextLoader> resolveExplicitContextLoaderClass(
 			List<ContextConfigurationAttributes> configAttributesList) {
 
 		Assert.notNull(configAttributesList, "ContextConfigurationAttributes list must not be null");

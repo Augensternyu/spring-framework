@@ -24,26 +24,26 @@ import org.springframework.web.util.ServletRequestPathUtils;
 import org.springframework.web.util.pattern.PathPatternParser;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.InstanceOfAssertFactories.STRING;
 
 /**
  * Tests for {@link PathPatternsRequestCondition}.
  *
  * @author Rossen Stoyanchev
  */
-public class PathPatternsRequestConditionTests {
+class PathPatternsRequestConditionTests {
 
 	private static final PathPatternParser parser = new PathPatternParser();
 
 
 	@Test
 	void prependSlash() {
-		assertThat(createCondition("foo").getPatternValues()).element(0)
-				.isEqualTo("/foo");
+		assertThat(createCondition("foo").getPatternValues()).containsExactly("/foo");
 	}
 
 	@Test
 	void prependNonEmptyPatternsOnly() {
-		assertThat(createCondition("").getPatternValues()).element(0).asString()
+		assertThat(createCondition("").getPatternValues()).first(STRING)
 				.as("Do not prepend empty patterns (SPR-8255)").isEmpty();
 	}
 
@@ -124,29 +124,6 @@ public class PathPatternsRequestConditionTests {
 		PathPatternsRequestCondition expected = createCondition("/foo/bar", "/foo/*", "/**");
 
 		assertThat(match).isEqualTo(expected);
-	}
-
-	@Test
-	@SuppressWarnings("deprecation")
-	void matchTrailingSlash() {
-		MockHttpServletRequest request = createRequest("/foo/");
-
-		PathPatternParser patternParser = new PathPatternParser();
-		patternParser.setMatchOptionalTrailingSeparator(true);
-
-		PathPatternsRequestCondition condition = new PathPatternsRequestCondition(patternParser, "/foo");
-		PathPatternsRequestCondition match = condition.getMatchingCondition(request);
-
-		assertThat(match).isNotNull();
-		assertThat(match.getPatternValues()).element(0).as("Should match by default").isEqualTo("/foo");
-
-		PathPatternParser strictParser = new PathPatternParser();
-		strictParser.setMatchOptionalTrailingSeparator(false);
-
-		condition = new PathPatternsRequestCondition(strictParser, "/foo");
-		match = condition.getMatchingCondition(request);
-
-		assertThat(match).isNull();
 	}
 
 	@Test

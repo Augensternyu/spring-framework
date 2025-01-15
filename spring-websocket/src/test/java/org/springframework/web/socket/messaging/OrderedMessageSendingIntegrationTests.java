@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,11 +28,11 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import org.springframework.lang.Nullable;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageHandler;
 import org.springframework.messaging.MessagingException;
@@ -70,7 +70,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Rossen Stoyanchev
  */
-public class OrderedMessageSendingIntegrationTests {
+class OrderedMessageSendingIntegrationTests {
 
 	private static final Log logger = LogFactory.getLog(OrderedMessageSendingIntegrationTests.class);
 
@@ -88,7 +88,7 @@ public class OrderedMessageSendingIntegrationTests {
 
 
 	@BeforeEach
-	public void setup() {
+	void setup() {
 		this.blockingSession = new BlockingWebSocketSession();
 		this.blockingSession.setId("1");
 		this.blockingSession.setOpen(true);
@@ -105,7 +105,7 @@ public class OrderedMessageSendingIntegrationTests {
 	}
 
 	@AfterEach
-	public void tearDown() {
+	void tearDown() {
 		this.executor.shutdown();
 	}
 
@@ -157,7 +157,7 @@ public class OrderedMessageSendingIntegrationTests {
 		// Send one to block
 		this.orderedClientOutChannel.send(createMessage(0));
 
-		// Exceed send time..
+		// Exceed send time
 		Thread.sleep(200);
 
 		CountDownLatch messageLatch = new CountDownLatch(1);
@@ -214,8 +214,7 @@ public class OrderedMessageSendingIntegrationTests {
 
 		private final WebSocketSession session;
 
-		@Nullable
-		private CountDownLatch messageLatch;
+		private @Nullable CountDownLatch messageLatch;
 
 		private final Queue<Message<?>> messages = new LinkedBlockingQueue<>();
 

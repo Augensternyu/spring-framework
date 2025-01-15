@@ -41,6 +41,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 class AntPathMatcherTests {
 
 	private final AntPathMatcher pathMatcher = new AntPathMatcher();
+	private final AntPathMatcher dotSeparatedPathMatcher = new AntPathMatcher(".");
 
 
 	@Test
@@ -357,6 +358,24 @@ class AntPathMatcherTests {
 		assertThat(result).isEqualTo(expected);
 	}
 
+	@Test // gh-26264
+	void extractUriTemplateVariablesFromDotSeparatedPath() {
+		Map<String, String> result = dotSeparatedPathMatcher.extractUriTemplateVariables("price.stock.{tickerSymbol}", "price.stock.aaa");
+		assertThat(result).isEqualTo(Collections.singletonMap("tickerSymbol", "aaa"));
+
+		result = dotSeparatedPathMatcher.extractUriTemplateVariables("price.stock.{ticker/symbol}", "price.stock.aaa");
+		assertThat(result).isEqualTo(Collections.singletonMap("ticker/symbol", "aaa"));
+
+		result = dotSeparatedPathMatcher.extractUriTemplateVariables("notification.**.{operation}", "notification.foo.update");
+		assertThat(result).isEqualTo(Collections.singletonMap("operation", "update"));
+
+		result = dotSeparatedPathMatcher.extractUriTemplateVariables("news.sports.feed/{type}", "news.sports.feed/xml");
+		assertThat(result).isEqualTo(Collections.singletonMap("type", "xml"));
+
+		result = dotSeparatedPathMatcher.extractUriTemplateVariables("news.sports.{operation}/*", "news.sports.feed/xml");
+		assertThat(result).isEqualTo(Collections.singletonMap("operation", "feed"));
+	}
+
 	@Test
 	void extractUriTemplateVariablesRegex() {
 		Map<String, String> result = pathMatcher
@@ -506,6 +525,16 @@ class AntPathMatcherTests {
 	}
 
 	@Test
+	void patternComparatorWithDotSeparator() {
+		Comparator<String> comparator = dotSeparatedPathMatcher.getPatternComparator("price.stock.spring");
+
+		assertThat(comparator.compare(null, null)).isEqualTo(0);
+		assertThat(comparator.compare("price.stock.ticker/symbol", "price.stock.ticker/symbol")).isEqualTo(0);
+		assertThat(comparator.compare("price.stock.**", "price.stock.ticker")).isEqualTo(1);
+	}
+
+
+	@Test
 	void patternComparatorSort() {
 		Comparator<String> comparator = pathMatcher.getPatternComparator("/hotels/new");
 		List<String> paths = new ArrayList<>(3);
@@ -513,74 +542,63 @@ class AntPathMatcherTests {
 		paths.add(null);
 		paths.add("/hotels/new");
 		paths.sort(comparator);
-		assertThat(paths).element(0).isEqualTo("/hotels/new");
-		assertThat(paths).element(1).isNull();
+		assertThat(paths).containsExactly("/hotels/new", null);
 		paths.clear();
 
 		paths.add("/hotels/new");
 		paths.add(null);
 		paths.sort(comparator);
-		assertThat(paths).element(0).isEqualTo("/hotels/new");
-		assertThat(paths).element(1).isNull();
+		assertThat(paths).containsExactly("/hotels/new", null);
 		paths.clear();
 
 		paths.add("/hotels/*");
 		paths.add("/hotels/new");
 		paths.sort(comparator);
-		assertThat(paths).element(0).isEqualTo("/hotels/new");
-		assertThat(paths).element(1).isEqualTo("/hotels/*");
+		assertThat(paths).containsExactly("/hotels/new", "/hotels/*");
 		paths.clear();
 
 		paths.add("/hotels/new");
 		paths.add("/hotels/*");
 		paths.sort(comparator);
-		assertThat(paths).element(0).isEqualTo("/hotels/new");
-		assertThat(paths).element(1).isEqualTo("/hotels/*");
+		assertThat(paths).containsExactly("/hotels/new", "/hotels/*");
 		paths.clear();
 
 		paths.add("/hotels/**");
 		paths.add("/hotels/*");
 		paths.sort(comparator);
-		assertThat(paths).element(0).isEqualTo("/hotels/*");
-		assertThat(paths).element(1).isEqualTo("/hotels/**");
+		assertThat(paths).containsExactly("/hotels/*", "/hotels/**");
 		paths.clear();
 
 		paths.add("/hotels/*");
 		paths.add("/hotels/**");
 		paths.sort(comparator);
-		assertThat(paths).element(0).isEqualTo("/hotels/*");
-		assertThat(paths).element(1).isEqualTo("/hotels/**");
+		assertThat(paths).containsExactly("/hotels/*", "/hotels/**");
 		paths.clear();
 
 		paths.add("/hotels/{hotel}");
 		paths.add("/hotels/new");
 		paths.sort(comparator);
-		assertThat(paths).element(0).isEqualTo("/hotels/new");
-		assertThat(paths).element(1).isEqualTo("/hotels/{hotel}");
+		assertThat(paths).containsExactly("/hotels/new", "/hotels/{hotel}");
 		paths.clear();
 
 		paths.add("/hotels/new");
 		paths.add("/hotels/{hotel}");
 		paths.sort(comparator);
-		assertThat(paths).element(0).isEqualTo("/hotels/new");
-		assertThat(paths).element(1).isEqualTo("/hotels/{hotel}");
+		assertThat(paths).containsExactly("/hotels/new", "/hotels/{hotel}");
 		paths.clear();
 
 		paths.add("/hotels/*");
 		paths.add("/hotels/{hotel}");
 		paths.add("/hotels/new");
 		paths.sort(comparator);
-		assertThat(paths).element(0).isEqualTo("/hotels/new");
-		assertThat(paths).element(1).isEqualTo("/hotels/{hotel}");
-		assertThat(paths).element(2).isEqualTo("/hotels/*");
+		assertThat(paths).containsExactly("/hotels/new", "/hotels/{hotel}", "/hotels/*");
 		paths.clear();
 
 		paths.add("/hotels/ne*");
 		paths.add("/hotels/n*");
 		Collections.shuffle(paths);
 		paths.sort(comparator);
-		assertThat(paths).element(0).isEqualTo("/hotels/ne*");
-		assertThat(paths).element(1).isEqualTo("/hotels/n*");
+		assertThat(paths).containsExactly("/hotels/ne*", "/hotels/n*");
 		paths.clear();
 
 		comparator = pathMatcher.getPatternComparator("/hotels/new.html");
@@ -588,16 +606,14 @@ class AntPathMatcherTests {
 		paths.add("/hotels/{hotel}");
 		Collections.shuffle(paths);
 		paths.sort(comparator);
-		assertThat(paths).element(0).isEqualTo("/hotels/new.*");
-		assertThat(paths).element(1).isEqualTo("/hotels/{hotel}");
+		assertThat(paths).containsExactly("/hotels/new.*", "/hotels/{hotel}");
 		paths.clear();
 
 		comparator = pathMatcher.getPatternComparator("/web/endUser/action/login.html");
 		paths.add("/**/login.*");
 		paths.add("/**/endUser/action/login.*");
 		paths.sort(comparator);
-		assertThat(paths).element(0).isEqualTo("/**/endUser/action/login.*");
-		assertThat(paths).element(1).isEqualTo("/**/login.*");
+		assertThat(paths).containsExactly("/**/endUser/action/login.*", "/**/login.*");
 		paths.clear();
 	}
 

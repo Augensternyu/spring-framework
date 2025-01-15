@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,10 +19,12 @@ package org.springframework.web.reactive.function.client;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
@@ -46,7 +48,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.reactive.ClientHttpResponse;
 import org.springframework.http.codec.DecoderHttpMessageReader;
 import org.springframework.http.codec.json.Jackson2JsonDecoder;
-import org.springframework.lang.Nullable;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
@@ -71,8 +72,7 @@ class DefaultClientResponseTests {
 
 	private final ExchangeStrategies mockExchangeStrategies = mock();
 
-	@Nullable
-	private HttpRequest httpRequest = null;
+	private @Nullable HttpRequest httpRequest = null;
 
 	private DefaultClientResponse defaultClientResponse;
 
@@ -301,6 +301,7 @@ class DefaultClientResponseTests {
 	}
 
 	@Test
+	@SuppressWarnings("deprecation")
 	void createException() {
 		byte[] bytes = "foo".getBytes(StandardCharsets.UTF_8);
 		DataBuffer dataBuffer = DefaultDataBufferFactory.sharedInstance.wrap(bytes);
@@ -324,6 +325,11 @@ class DefaultClientResponseTests {
 			public HttpHeaders getHeaders() {
 				return HttpHeaders.EMPTY;
 			}
+
+			@Override
+			public Map<String, Object> getAttributes() {
+				return Collections.emptyMap();
+			}
 		};
 
 		given(mockExchangeStrategies.messageReaders()).willReturn(
@@ -333,7 +339,7 @@ class DefaultClientResponseTests {
 		WebClientResponseException exception = resultMono.block();
 		assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
 		assertThat(exception.getMessage()).isEqualTo("404 Not Found from UNKNOWN https://example.org:9999/app/path");
-		assertThat(exception.getHeaders()).containsExactly(entry("Content-Type", List.of("text/plain")));
+		assertThat(exception.getHeaders().asMultiValueMap()).containsExactly(entry("Content-Type", List.of("text/plain")));
 		assertThat(exception.getResponseBodyAsByteArray()).isEqualTo(bytes);
 	}
 
@@ -374,6 +380,7 @@ class DefaultClientResponseTests {
 	}
 
 	@Test
+	@SuppressWarnings("deprecation")
 	void createError() {
 		byte[] bytes = "foo".getBytes(StandardCharsets.UTF_8);
 		DataBuffer dataBuffer = DefaultDataBufferFactory.sharedInstance.wrap(bytes);
@@ -392,7 +399,7 @@ class DefaultClientResponseTests {
 					WebClientResponseException exception = (WebClientResponseException) t;
 					assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
 					assertThat(exception.getMessage()).isEqualTo("404 Not Found");
-					assertThat(exception.getHeaders()).containsExactly(entry("Content-Type",List.of("text/plain")));
+					assertThat(exception.getHeaders().asMultiValueMap()).containsExactly(entry("Content-Type",List.of("text/plain")));
 					assertThat(exception.getResponseBodyAsByteArray()).isEqualTo(bytes);
 				})
 				.verify();
