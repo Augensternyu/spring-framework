@@ -77,6 +77,7 @@ import org.springframework.core.NamedThreadLocal;
 import org.springframework.core.OrderComparator;
 import org.springframework.core.Ordered;
 import org.springframework.core.ResolvableType;
+import org.springframework.core.SpringProperties;
 import org.springframework.core.annotation.MergedAnnotation;
 import org.springframework.core.annotation.MergedAnnotations;
 import org.springframework.core.annotation.MergedAnnotations.SearchStrategy;
@@ -128,6 +129,15 @@ import org.springframework.util.StringUtils;
 public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFactory
 		implements ConfigurableListableBeanFactory, BeanDefinitionRegistry, Serializable {
 
+	/**
+	 * System property that instructs Spring to enforce strict locking during bean creation,
+	 * rather than the mix of strict and lenient locking that 6.2 applies by default. Setting
+	 * this flag to "true" restores 6.1.x style locking in the entire pre-instantiation phase.
+	 * @since 6.2.6
+	 * @see #preInstantiateSingletons()
+	 */
+	public static final String STRICT_LOCKING_PROPERTY_NAME = "spring.locking.strict";
+
 	private static @Nullable Class<?> jakartaInjectProviderClass;
 
 	static {
@@ -145,6 +155,9 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 	/** Map from serialized id to factory instance. */
 	private static final Map<String, Reference<DefaultListableBeanFactory>> serializableFactories =
 			new ConcurrentHashMap<>(8);
+
+	/** Whether lenient locking is allowed in this factory. */
+	private final boolean lenientLockingAllowed = !SpringProperties.getFlag(STRICT_LOCKING_PROPERTY_NAME);
 
 	/** Optional id for this factory, for serialization purposes. */
 	private @Nullable String serializationId;
@@ -614,9 +627,14 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 							}
 						}
 						else {
-							if (includeNonSingletons || isNonLazyDecorated ||
-									(allowFactoryBeanInit && isSingleton(beanName, mbd, dbd))) {
+							if (includeNonSingletons || isNonLazyDecorated) {
 								matchFound = isTypeMatch(beanName, type, allowFactoryBeanInit);
+							}
+							else if (allowFactoryBeanInit) {
+								// Type check before singleton check, avoiding FactoryBean instantiation
+								// for early FactoryBean.isSingleton() calls on non-matching beans.
+								matchFound = isTypeMatch(beanName, type, allowFactoryBeanInit) &&
+										isSingleton(beanName, mbd, dbd);
 							}
 							if (!matchFound) {
 								// In case of FactoryBean, try to match FactoryBean instance itself next.
@@ -881,7 +899,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 			String beanName, DependencyDescriptor descriptor, AutowireCandidateResolver resolver)
 			throws NoSuchBeanDefinitionException {
 
-		String bdName = BeanFactoryUtils.transformedBeanName(beanName);
+		String bdName = transformedBeanName(beanName);
 		if (containsBeanDefinition(bdName)) {
 			return isAutowireCandidate(beanName, getMergedLocalBeanDefinition(bdName), descriptor, resolver);
 		}
@@ -915,7 +933,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 	protected boolean isAutowireCandidate(String beanName, RootBeanDefinition mbd,
 			DependencyDescriptor descriptor, AutowireCandidateResolver resolver) {
 
-		String bdName = BeanFactoryUtils.transformedBeanName(beanName);
+		String bdName = transformedBeanName(beanName);
 		resolveBeanClass(mbd, bdName);
 		if (mbd.isFactoryMethodUnique && mbd.factoryMethodToIntrospect == null) {
 			new ConstructorResolver(this).resolveFactoryMethodIfPossible(mbd);
@@ -993,6 +1011,14 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 	}
 
 	@Override
+	protected void cacheMergedBeanDefinition(RootBeanDefinition mbd, String beanName) {
+		super.cacheMergedBeanDefinition(mbd, beanName);
+		if (mbd.isPrimary()) {
+			this.primaryBeanNames.add(beanName);
+		}
+	}
+
+	@Override
 	protected void checkMergedBeanDefinition(RootBeanDefinition mbd, String beanName, @Nullable Object @Nullable [] args) {
 		super.checkMergedBeanDefinition(mbd, beanName, args);
 
@@ -1015,7 +1041,8 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 
 	@Override
 	protected @Nullable Boolean isCurrentThreadAllowedToHoldSingletonLock() {
-		return (this.preInstantiationPhase ? this.preInstantiationThread.get() != PreInstantiation.BACKGROUND : null);
+		return (this.lenientLockingAllowed && this.preInstantiationPhase ?
+				this.preInstantiationThread.get() != PreInstantiation.BACKGROUND : null);
 	}
 
 	@Override
